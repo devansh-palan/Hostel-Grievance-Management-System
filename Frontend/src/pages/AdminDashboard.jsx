@@ -5,13 +5,15 @@ export default function AdminDashboard() {
   const [complaints, setComplaints] = useState([]);
   const [workerMap, setWorkerMap] = useState({});
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
   const [assigning, setAssigning] = useState(false);
+  const [message, setMessage] = useState("");
 
   const username = localStorage.getItem("admin_username");
   const hostel = localStorage.getItem("admin_hostel");
 
-  // Load complaints (Pending + In Progress)
+  // ==========================
+  // Fetch all pending + in-progress complaints
+  // ==========================
   async function loadComplaints() {
     try {
       const res = await fetch(
@@ -28,7 +30,9 @@ export default function AdminDashboard() {
     }
   }
 
-  // Fetch workers dynamically per complaint (based on type)
+  // ==========================
+  // Load workers dynamically based on work type and hostel
+  // ==========================
   async function loadWorkersForType(workType, complaintId) {
     try {
       const res = await fetch(
@@ -44,7 +48,9 @@ export default function AdminDashboard() {
     }
   }
 
-  // ✅ Assign worker (calls backend that sends WhatsApp automatically)
+  // ==========================
+  // Assign worker and send WhatsApp automatically
+  // ==========================
   async function assignWorker(complaintId, workerName) {
     if (!workerName) return alert("Please select a worker first.");
     setAssigning(true);
@@ -73,6 +79,9 @@ export default function AdminDashboard() {
     }
   }
 
+  // ==========================
+  // Update complaint status (Pending / In Progress / Resolved)
+  // ==========================
   async function updateStatus(id, newStatus) {
     try {
       await fetch(
@@ -89,12 +98,18 @@ export default function AdminDashboard() {
     }
   }
 
+  // ==========================
+  // Logout
+  // ==========================
   function logout() {
     localStorage.removeItem("admin_username");
     localStorage.removeItem("admin_hostel");
     window.location.href = "/admin";
   }
 
+  // ==========================
+  // Lifecycle Hooks
+  // ==========================
   useEffect(() => {
     loadComplaints();
   }, []);
@@ -105,8 +120,12 @@ export default function AdminDashboard() {
     });
   }, [complaints]);
 
+  // ==========================
+  // UI
+  // ==========================
   return (
     <div className="adminPageWrap">
+      {/* Topbar */}
       <div className="adminTopbar">
         <div className="adminTopbar__left">
           <h1 className="adminGreeting">Welcome, {username || "Admin"}</h1>
@@ -121,6 +140,7 @@ export default function AdminDashboard() {
 
       {message && <div className="adminInlineAlert">{message}</div>}
 
+      {/* Complaints Section */}
       <section className="complaintsSection">
         <div className="sectionHead">
           <h2 className="sectionTitle">Pending & In-Progress Complaints</h2>
@@ -135,6 +155,7 @@ export default function AdminDashboard() {
           <ul className="complaintList">
             {complaints.map((c) => (
               <li className="complaintItem" key={c.id}>
+                {/* Header */}
                 <div className="complaintHead">
                   <div className="idType">
                     <span className="cid">#{c.id}</span>
@@ -152,6 +173,7 @@ export default function AdminDashboard() {
 
                 <p className="cdesc">{c.description}</p>
 
+                {/* Meta info */}
                 <div className="metaRow">
                   <div className="metaPair">
                     <span className="metaLabel">Room</span>
@@ -163,9 +185,10 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* Student Proof */}
                 <div className="metaRow">
                   <div className="metaPair" style={{ gridColumn: "span 3" }}>
-                    <span className="metaLabel">Proof</span>
+                    <span className="metaLabel">Student Proof</span>
                     <span className="metaValue">
                       {c.photo_url ? (
                         <a
@@ -188,55 +211,88 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="actionRowSpace">
-                  {/* Worker assignment section */}
-                  <div className="actionBlock">
-                    <label className="actionLabel">Assign Worker</label>
-                    <select
-                      id={`worker-${c.id}`}
-                      className="workerSelect"
-                      defaultValue=""
-                    >
-                      <option value="">Select Worker</option>
-                      {workerMap[c.id]?.length > 0 ? (
-                        workerMap[c.id].map((w) => (
-                          <option key={w.id} value={w.name}>
-                            {w.name} ({w.work_type})
-                          </option>
-                        ))
-                      ) : (
-                        <option disabled>No available workers</option>
-                      )}
-                    </select>
+                {/* Worker Proof */}
+                {c.worker_proof_url && (
+                  <div className="metaRow">
+                    <div className="metaPair" style={{ gridColumn: "span 3" }}>
+                      <span className="metaLabel">Worker Proof</span>
+                      <span className="metaValue">
+                        <a
+                          className="proofLink"
+                          href={c.worker_proof_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <img
+                            src={c.worker_proof_url}
+                            alt="worker-proof"
+                            className="proofThumb"
+                          />
+                          <span>View</span>
+                        </a>
+                      </span>
+                    </div>
                   </div>
+                )}
 
-                  {/* Status update */}
-                  <div className="actionBlock">
-                    <label className="actionLabel">Update Status</label>
-                    <select
-                      className="statusSelect"
-                      value={c.status}
-                      onChange={(e) => updateStatus(c.id, e.target.value)}
-                    >
-                      <option value="Pending">Pending</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Resolved">Resolved</option>
-                    </select>
-                  </div>
+                {/* Worker assignment + Status */}
+<div className="actionRowSpace">
+  <div className="actionBlock">
+    <label className="actionLabel">Assign Worker</label>
+    {c.assigned_worker ? (
+      <div className="assignedWorkerBox">
+        <span className="assignedWorkerName">
+          👷 {c.assigned_worker}
+        </span>
+        <span className="assignedWorkerNote">(Already Assigned)</span>
+      </div>
+    ) : (
+      <select
+        id={`worker-${c.id}`}
+        className="workerSelect"
+        defaultValue=""
+      >
+        <option value="">Select Worker</option>
+        {workerMap[c.id]?.length > 0 ? (
+          workerMap[c.id].map((w) => (
+            <option key={w.id} value={w.name}>
+              {w.name} ({w.work_type})
+            </option>
+          ))
+        ) : (
+          <option disabled>No available workers</option>
+        )}
+      </select>
+    )}
+  </div>
 
-                  <button
-                    className="assignBtn"
-                    disabled={assigning}
-                    onClick={() => {
-                      const worker = document.querySelector(
-                        `#worker-${c.id}`
-                      )?.value;
-                      assignWorker(c.id, worker);
-                    }}
-                  >
-                    {assigning ? "Assigning..." : "Assign Task"}
-                  </button>
-                </div>
+  <div className="actionBlock">
+    <label className="actionLabel">Update Status</label>
+    <select
+      className="statusSelect"
+      value={c.status}
+      onChange={(e) => updateStatus(c.id, e.target.value)}
+    >
+      <option value="Pending">Pending</option>
+      <option value="In Progress">In Progress</option>
+      <option value="Resolved">Resolved</option>
+    </select>
+  </div>
+
+  {!c.assigned_worker && (
+    <button
+      className="assignBtn"
+      disabled={assigning}
+      onClick={() => {
+        const worker = document.querySelector(`#worker-${c.id}`)?.value;
+        assignWorker(c.id, worker);
+      }}
+    >
+      {assigning ? "Assigning..." : "Assign Task"}
+    </button>
+  )}
+</div>
+
               </li>
             ))}
           </ul>

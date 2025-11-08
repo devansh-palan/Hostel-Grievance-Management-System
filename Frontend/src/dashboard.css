@@ -271,3 +271,21 @@
     flex-direction: column;
   }
 }
+
+.assignedWorkerBox {
+  background: #f4f4f4;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-weight: 500;
+  color: #333;
+}
+
+.assignedWorkerName {
+  color: #2a7bff;
+  margin-right: 6px;
+}
+
+.assignedWorkerNote {
+  color: #888;
+  font-size: 0.85rem;
+}
