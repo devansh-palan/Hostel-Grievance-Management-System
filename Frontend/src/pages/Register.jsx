@@ -1,74 +1,128 @@
 import { useState } from "react";
-import { apiRequest } from "../utils/api";
-import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { useNavigate, Link } from "react-router-dom";
 
 export default function Register() {
+  const navigate = useNavigate();
+  const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
-  const [msg, setMsg] = useState("");
-  const navigate = useNavigate();
+  const [message, setMessage] = useState("");
 
-  async function handleRegister(e) {
+  async function handleSendOtp(e) {
     e.preventDefault();
+    setMessage("");
     try {
-      const res = await apiRequest("/register", "POST", { email, name });
-      setMsg(res.message);
-      setOtpSent(true);
+      const res = await axios.post(
+        "http://localhost:5000/api/register",
+        { email, name },
+        { withCredentials: true }
+      );
+      setMessage(res.data.message);
+      setStep(2);
     } catch (err) {
-      setMsg(err.message);
+      setMessage(err.response?.data?.message || "Error sending OTP");
     }
   }
 
-  async function handleVerify(e) {
+  async function handleVerifyOtp(e) {
     e.preventDefault();
+    setMessage("");
     try {
-      const res = await apiRequest("/verify-otp", "POST", { email, otp });
-      setMsg(res.message);
-      navigate("/dashboard");
+      const res = await axios.post(
+        "http://localhost:5000/api/verify-otp",
+        { email, otp },
+        { withCredentials: true }
+      );
+      setMessage(res.data.message);
+      setTimeout(() => navigate("/dashboard"), 1000);
     } catch (err) {
-      setMsg(err.message);
+      setMessage(err.response?.data?.message || "OTP verification failed");
     }
   }
 
   return (
-    <div className="flex flex-col items-center mt-10">
-      <h1 className="text-2xl font-bold mb-4">Register</h1>
-      {!otpSent ? (
-        <form onSubmit={handleRegister} className="flex flex-col gap-3 w-80">
-          <input
-            type="text"
-            placeholder="Full name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            className="border p-2 rounded"
-          />
-          <input
-            type="email"
-            placeholder="Institute Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="border p-2 rounded"
-          />
-          <button className="bg-blue-600 text-white py-2 rounded">Send OTP</button>
-        </form>
-      ) : (
-        <form onSubmit={handleVerify} className="flex flex-col gap-3 w-80">
-          <input
-            type="text"
-            placeholder="Enter OTP"
-            value={otp}
-            onChange={(e) => setOtp(e.target.value)}
-            required
-            className="border p-2 rounded"
-          />
-          <button className="bg-green-600 text-white py-2 rounded">Verify OTP</button>
-        </form>
-      )}
-      {msg && <p className="mt-3 text-sm text-gray-700">{msg}</p>}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4">
+      <div className="w-full max-w-md bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-xl p-8 text-white">
+        {step === 1 ? (
+          <>
+            <h2 className="text-3xl font-bold text-center mb-6">
+              Register Account 🏠
+            </h2>
+            <form onSubmit={handleSendOtp} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter your full name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="w-full p-3 rounded-lg bg-white/10 border border-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Institute Email
+                </label>
+                <input
+                  type="email"
+                  placeholder="Enter your institute email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full p-3 rounded-lg bg-white/10 border border-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 font-semibold text-white transition-all"
+              >
+                Send OTP
+              </button>
+            </form>
+          </>
+        ) : (
+          <>
+            <h2 className="text-3xl font-bold text-center mb-6">
+              Verify OTP 🔐
+            </h2>
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Enter OTP
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter 6-digit OTP"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  required
+                  className="w-full p-3 rounded-lg bg-white/10 border border-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 font-semibold text-white transition-all"
+              >
+                Verify
+              </button>
+            </form>
+          </>
+        )}
+
+        {message && <p className="text-center mt-4 text-sm">{message}</p>}
+
+        <p className="text-center text-sm mt-6">
+          Already registered?{" "}
+          <Link to="/" className="text-indigo-300 hover:underline">
+            Login here
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
