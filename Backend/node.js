@@ -10,8 +10,49 @@ import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import twilio from "twilio";
 import axios from "axios";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 dotenv.config();
+
+// ✅ Initialize Gemini
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// 🤖 Gemini AI Classifier — outputs strictly "normal" or "critical"
+async function classifyComplaintPriority(description) {
+  const prompt = `
+You are an intelligent hostel maintenance assistant.
+Your task is to classify the student's complaint into one of two categories:
+- "normal" for regular maintenance issues
+- "critical" for emergencies or urgent issues.
+
+Respond with ONLY one word: "normal" or "critical". 
+Do not include any explanation or extra text.
+
+Complaint:
+"""${description}"""
+`;
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const result = await model.generateContent(prompt);
+
+    const output = result.response.text().trim().toLowerCase();
+    if (output.includes("critical")) return "critical";
+    return "normal";
+  } catch (err) {
+    console.error("❌ Gemini classification failed:", err.message);
+    return "normal";
+  }
+}
+
+export { classifyComplaintPriority };
+
+
+
+
+
+
+
 const app = express();
 const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
@@ -168,12 +209,17 @@ app.post("/api/verify-otp", async (req, res) => {
 // ===============================
 // 📝 POST NEW COMPLAINT
 // ===============================
+// ===============================
+// 📝 POST NEW COMPLAINT (AI Priority Classification)
+// ===============================
 app.post("/api/complaints", authMiddleware, upload.single("photo"), async (req, res) => {
   const { type, description, hostel_name, room_no, floor_no, phone_number } = req.body;
-if (!type || !description || !hostel_name || !room_no || !phone_number)
-  return res.status(400).json({ message: "All fields are required" });
+
+  if (!type || !description || !hostel_name || !room_no || !phone_number)
+    return res.status(400).json({ message: "All fields are required" });
 
   try {
+    // 🧍 Get user info
     const userRes = await db.query("SELECT id FROM users WHERE email = $1", [req.user.email]);
     if (userRes.rows.length === 0)
       return res.status(400).json({ message: "User not found" });
@@ -181,20 +227,30 @@ if (!type || !description || !hostel_name || !room_no || !phone_number)
     const userId = userRes.rows[0].id;
     const photoUrl = req.file ? req.file.path : null;
 
+    // 🧠 Classify priority using Gemini AI
+    const priority = await classifyComplaintPriority(description);
+    console.log(`🔍 Complaint classified as: ${priority}`);
+
+    // 💾 Save complaint in database
     const result = await db.query(
-  `INSERT INTO complaints (user_id, type, description, hostel_name, room_no, floor_no, phone_number, photo_url)
-   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-   RETURNING id, type, description, hostel_name, room_no, floor_no, phone_number, photo_url, status`,
-  [userId, type, description, hostel_name, room_no, floor_no, phone_number, photoUrl]
-);
+      `INSERT INTO complaints 
+       (user_id, type, description, hostel_name, room_no, floor_no, phone_number, photo_url, priority)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING id, type, description, hostel_name, room_no, floor_no, phone_number, photo_url, status, priority`,
+      [userId, type, description, hostel_name, room_no, floor_no, phone_number, photoUrl, priority]
+    );
 
+    res.json({
+      message: "Complaint submitted successfully",
+      complaint: result.rows[0],
+    });
 
-    res.json({ message: "Complaint submitted successfully", complaint: result.rows[0] });
   } catch (err) {
-    console.error(err);
+    console.error("❌ Error creating complaint:", err);
     res.status(500).json({ message: "Error creating complaint" });
   }
 });
+
 
 
 // ===============================
@@ -234,17 +290,21 @@ app.get("/api/admin/complaints/pending", async (req, res) => {
     if (!hostel) return res.status(400).json({ message: "Hostel required" });
 
     const complaints = await db.query(
-      `SELECT 
-         c.id, c.type, c.description, c.hostel_name, c.room_no, c.floor_no, c.status, 
-         c.created_at, c.photo_url, c.worker_proof_url, c.assigned_worker,
-         u.name AS student_name, u.email AS student_email
-       FROM complaints c
-       JOIN users u ON c.user_id = u.id
-       WHERE c.hostel_name = $1
-         AND (c.status = 'Pending' OR c.status = 'In Progress')
-       ORDER BY c.created_at DESC`,
-      [hostel]
-    );
+  `SELECT 
+     c.id, c.type, c.description, c.hostel_name, c.room_no, c.floor_no,
+     c.phone_number, c.status, c.priority,
+     c.created_at, c.photo_url, c.worker_proof_url, c.assigned_worker,
+     u.name AS student_name, u.email AS student_email
+   FROM complaints c
+   JOIN users u ON c.user_id = u.id
+   WHERE c.hostel_name = $1
+     AND (c.status = 'Pending' OR c.status = 'In Progress')
+   ORDER BY 
+     CASE WHEN c.priority = 'critical' THEN 1 ELSE 2 END,
+     c.created_at DESC`,
+  [hostel]
+);
+
 
     res.json({ complaints: complaints.rows });
   } catch (err) {
