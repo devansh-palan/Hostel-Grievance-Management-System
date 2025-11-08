@@ -1,0 +1,294 @@
+/* =========================================================
+   IMPORT FONTS
+========================================================= */
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Poppins:wght@300;400;500;600;700;900&display=swap');
+
+/* =========================================================
+   GLOBAL RESET
+========================================================= */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  font-family: "Poppins", sans-serif;
+}
+
+/* =========================================================
+   VARIABLES
+========================================================= */
+:root {
+  --primary: #ff6b00;
+  --primary-light: #ff8c33;
+  --primary-dark: #e65a00;
+
+  --card-h: min(72vh, 720px); /* equal height cards */
+  --card-radius: 40px;
+
+  --poster-tight: -0.5px;
+  --poster-wide: 1px;
+}
+
+/* =========================================================
+   PAGE BASE STRUCTURE
+========================================================= */
+body {
+  background: #000;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.mainLoginContainer {
+  width: 100%;
+  min-height: 100vh;
+  background: #000;
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* total layout width = 80% */
+.pageShell {
+  width: 80vw;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* =========================================================
+   HEADER AREA
+========================================================= */
+.loginHeader {
+  width: 100%;
+  display: flex;
+  justify-content: space-between; /* logo left, buttons right */
+  align-items: center;
+  padding: 24px 0 6px 0;
+}
+
+/* ----- LOGO + TITLE LEFT SECTION ----- */
+.headerBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.headerLogo {
+  height: 36px;
+}
+
+.headerTitle {
+  font-family: "Anton", sans-serif;
+  color: #ffffff;
+  font-size: 26px;
+  letter-spacing: var(--poster-wide);
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* =========================================================
+   HEADER BUTTONS — ROUNDED TAB BUTTONS
+========================================================= */
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Rounded pill-like tabs */
+.headerTab {
+  font-family: "Anton", sans-serif;     /* SAME FONT AS HOSTEL RESOLVE */
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 18px;
+  text-decoration: none;
+  padding: 10px 22px;
+  border-radius: 40px;
+  border: 2px solid #2b2b2b;
+  background: #111;
+  color: #d6d6d6;
+  transition: 0.22s ease;
+}
+
+.headerTab:hover {
+  transform: translateY(-1px);
+  background: #181818;
+  border-color: #3c3c3c;
+  color: white;
+}
+
+/* Active tab = Orange filled pill */
+.headerTab.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: black;
+}
+
+/* =========================================================
+   TWO CARD LAYOUT (3:2 RATIO)
+========================================================= */
+.loginCardsWrapper {
+  width: 100%;
+  display: flex;
+  align-items: stretch; /* equal height */
+  gap: 40px;
+}
+
+.cardBox {
+  height: var(--card-h);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+}
+
+/* LEFT IMAGE CARD */
+.leftImageCard {
+  flex: 3 1 0;
+  background: #181818;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/*
+   Add your image:
+   .leftImageCard {
+     background-image: url("/yourImage.png");
+   }
+*/
+
+/* RIGHT LOGIN FORM CARD */
+.rightLoginCard {
+  flex: 2 1 0;
+  background: #111;
+  color: white;
+  padding: 60px 50px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* =========================================================
+   FORM POSTER VIBES
+========================================================= */
+.loginTitle {
+  font-family: "Anton", sans-serif;
+  text-transform: uppercase;
+  font-size: clamp(40px, 4.6vw, 56px);
+  line-height: 0.95;
+  letter-spacing: var(--poster-tight);
+  margin-bottom: 4px;
+}
+
+.loginTitle span {
+  color: var(--primary);
+}
+
+.loginSubTitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: #d7d7d7;
+  margin-bottom: 36px;
+  letter-spacing: 0.2px;
+}
+
+/* underline accent */
+.loginTitle + .loginSubTitle {
+  position: relative;
+  padding-top: 10px;
+}
+.loginTitle + .loginSubTitle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 64px;
+  background: var(--primary);
+  border-radius: 3px;
+}
+
+/* =========================================================
+   INPUT FIELDS
+========================================================= */
+.loginForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.loginForm label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e9e9e9;
+}
+
+.loginForm input {
+  width: 100%;
+  padding: 16px 18px;
+  border-radius: 35px;
+  border: 2px solid #3a3a3a;
+  background: #0e0e0e;
+  color: white;
+  font-size: 15px;
+  outline: none;
+}
+
+.loginForm input::placeholder {
+  color: #a8a8a8;
+}
+
+.loginForm input:focus {
+  border-color: var(--primary);
+  background: #0b0b0b;
+}
+
+/* =========================================================
+   SUBMIT BUTTON
+========================================================= */
+.loginBtn {
+  margin-top: 24px;
+  padding: 16px 18px;
+  background: var(--primary);
+  border: none;
+  border-radius: 40px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  color: #000;
+  cursor: pointer;
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+.loginBtn:hover {
+  transform: translateY(-1px) scale(1.02);
+  filter: brightness(1.03);
+}
+
+/* =========================================================
+   RESPONSIVE DESIGN
+========================================================= */
+@media (max-width: 1200px) {
+  .rightLoginCard { padding: 48px 40px; }
+}
+
+@media (max-width: 960px) {
+  :root { --card-h: auto; }
+
+  .loginCardsWrapper {
+    flex-direction: column;
+  }
+
+  .rightLoginCard, .leftImageCard {
+    width: 100%;
+    flex: none;
+  }
+
+  .rightLoginCard { padding: 36px 26px; }
+
+  .headerTab {
+    font-size: 16px;
+    padding: 8px 16px;
+  }
+}

@@ -10,14 +10,17 @@ export default function ProtectedRoute({ children }) {
   useEffect(() => {
     async function checkAuth() {
       try {
-        await apiRequest("/me"); // verifies token cookie
+        const data = await apiRequest("/me"); // verifies JWT cookie
+        console.log("✅ Authenticated user:", data.user);
         setAuthenticated(true);
       } catch (err) {
-        navigate("/login");
+        console.warn("❌ Not authenticated:", err.message);
+        navigate("/login", { replace: true });
       } finally {
         setLoading(false);
       }
     }
+
     checkAuth();
   }, [navigate]);
 
