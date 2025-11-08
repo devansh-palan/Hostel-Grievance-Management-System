@@ -40,14 +40,14 @@
 }
 
 .adminLogoutBtn {
-  background: var(--primary, #ff6b00);
-  border: none;
-  color: #000;
-  font-weight: 800;
+  border: 1px solid var(--border);
+  background: #1a1a1a;
+  color: var(--text);
   padding: 10px 16px;
-  border-radius: 999px;
+  border-radius: 10px;
+  font-weight: 700;
   cursor: pointer;
-  transition: transform 0.18s ease, filter 0.18s ease;
+  transition: background .2s, border-color .2s;
 }
 .adminLogoutBtn:hover {
   transform: translateY(-1px);
