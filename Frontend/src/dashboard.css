@@ -1,9 +1,9 @@
 /* Dashboard listing styles only — no global resets here.
-   Works alongside your existing style.css dark/orange theme. */
+   Works along with style.css (theme: orange + black) */
 
 /* Layout shell */
 .adminPageWrap {
-  width: 80vw;              /* matches your .pageShell width */
+  width: 80vw;
   margin: 24px auto 60px;
   color: #eaeaea;
 }
@@ -32,7 +32,6 @@
 .adminGreeting {
   font-size: 20px;
   font-weight: 700;
-  letter-spacing: 0.2px;
 }
 
 .adminHostel {
@@ -55,7 +54,7 @@
   filter: brightness(1.05);
 }
 
-/* Inline alert/message */
+/* Alerts */
 .adminInlineAlert {
   margin: 14px 4px 0;
   background: #1a120e;
@@ -65,7 +64,7 @@
   border-radius: 12px;
 }
 
-/* Section head */
+/* Section */
 .complaintsSection {
   margin-top: 18px;
 }
@@ -91,7 +90,7 @@
   border-radius: 999px;
 }
 
-/* Loading & empty */
+/* Empty / Loading */
 .loadingRow,
 .emptyState {
   background: #0f0f0f;
@@ -102,17 +101,16 @@
   color: #bdbdbd;
 }
 
-/* List */
+/* List layout */
 .complaintList {
   display: grid;
   grid-template-columns: 1fr;
   gap: 14px;
   padding: 0;
-  margin: 0;
   list-style: none;
 }
 
-/* Card item */
+/* Card */
 .complaintItem {
   background: #101010;
   border: 1px solid #222;
@@ -125,12 +123,11 @@
   transform: translateY(-1px);
 }
 
-/* Head row */
+/* Top row */
 .complaintHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   margin-bottom: 6px;
 }
 
@@ -143,11 +140,10 @@
 .cid {
   font-weight: 800;
   font-size: 14px;
-  color: #f0f0f0;
   padding: 2px 8px;
-  border-radius: 999px;
   background: #171717;
   border: 1px solid #2a2a2a;
+  border-radius: 999px;
 }
 
 .ctype {
@@ -161,27 +157,21 @@
 
 /* Status badge */
 .statusBadge {
-  font-size: 12px;
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid #2a2a2a;
   background: #161616;
-  color: #dcdcdc;
-  text-transform: none;
 }
 .statusBadge.pending {
   background: #1a1610;
-  border-color: #3a2b17;
   color: #ffb76a;
 }
 .statusBadge.in-progress {
   background: #10171a;
-  border-color: #1d3a47;
   color: #84d0ff;
 }
 .statusBadge.resolved {
   background: #111a12;
-  border-color: #1d3a22;
   color: #9df2a7;
 }
 
@@ -189,14 +179,13 @@
 .cdesc {
   font-size: 14px;
   color: #d7d7d7;
-  line-height: 1.45;
   margin: 8px 2px 12px;
 }
 
-/* Meta row */
+/* Meta details */
 .metaRow {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   margin: 0 2px 12px;
 }
@@ -207,72 +196,78 @@
   padding: 10px 12px;
 }
 .metaLabel {
-  display: block;
   font-size: 11px;
   color: #9f9f9f;
-  margin-bottom: 2px;
 }
 .metaValue {
   font-size: 13px;
   color: #e9e9e9;
-  word-break: break-word;
 }
 
 /* Proof */
 .proofLink {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
   text-decoration: none;
-  color: #e9e9e9;
-  border-bottom: 1px dashed #3a3a3a;
-}
-.proofLink:hover {
-  border-bottom-color: #5a5a5a;
 }
 .proofThumb {
   width: 42px;
   height: 32px;
   object-fit: cover;
   border-radius: 6px;
-  border: 1px solid #2a2a2a;
 }
 
-/* Action row */
-.actionRow {
-  margin-top: 2px;
+/* ✅ Worker + Status + Assign */
+.actionRowSpace {
+  margin-top: 10px;
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-.actionLabel {
-  font-size: 12px;
-  color: #bfbfbf;
+.actionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
+.workerSelect,
 .statusSelect {
-  appearance: none;
   background: #121212;
-  color: #f0f0f0;
+  color: #fff;
   border: 1px solid #2a2a2a;
+  padding: 9px 12px;
   border-radius: 12px;
-  padding: 10px 12px;
-  font-size: 13px;
   cursor: pointer;
-  outline: none;
-  transition: border-color 0.15s ease, background 0.15s ease;
 }
-.statusSelect:hover {
-  border-color: #3a3a3a;
+
+.assignBtn {
+  background: var(--primary, #ff6b00);
+  color: black;
+  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.2s ease, filter 0.2s ease;
 }
-.statusSelect:focus {
-  border-color: var(--primary, #ff6b00);
-  background: #0f0f0f;
+.assignBtn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
 }
 
 /* Responsive */
 @media (max-width: 900px) {
-  .adminPageWrap { width: 92vw; }
-  .metaRow { grid-template-columns: 1fr; }
+  .adminPageWrap {
+    width: 92vw;
+  }
+  .metaRow {
+    grid-template-columns: 1fr;
+  }
+  .actionRowSpace {
+    flex-direction: column;
+  }
 }

@@ -60,6 +60,13 @@ body {
 /* =========================================================
    HEADER AREA
 ========================================================= */
+
+.headerTitle,
+.headerTitle *,
+.loginTitle,
+.loginTitle * {
+  font-family: "Anton", sans-serif !important;
+}
 .loginHeader {
   width: 100%;
   display: flex;

@@ -3,12 +3,14 @@ import "../dashboard.css";
 
 export default function AdminDashboard() {
   const [complaints, setComplaints] = useState([]);
+  const [workerMap, setWorkerMap] = useState({}); // each complaint has its own worker list
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
   const username = localStorage.getItem("admin_username");
   const hostel = localStorage.getItem("admin_hostel");
 
+  // Load all complaints (pending + in progress)
   async function loadComplaints() {
     try {
       const res = await fetch(
@@ -22,6 +24,40 @@ export default function AdminDashboard() {
       setMessage(err.message || "Error fetching complaints");
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Fetch workers dynamically by work type (problem type)
+  async function loadWorkersForType(workType, complaintId) {
+    try {
+      const res = await fetch(
+        `http://localhost:5000/api/admin/workers?hostel=${hostel}&work_type=${workType}`
+      );
+      const data = await res.json();
+      setWorkerMap((prev) => ({
+        ...prev,
+        [complaintId]: data.workers || [],
+      }));
+    } catch (err) {
+      console.error("Workers fetch failed:", err);
+    }
+  }
+
+  async function assignWorker(complaintId, worker) {
+    if (!worker) return alert("Select a worker first!");
+    try {
+      await fetch(
+        `http://localhost:5000/api/admin/complaints/${complaintId}/assign?hostel=${hostel}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ worker }),
+        }
+      );
+      alert("Worker Assigned ✅");
+      loadComplaints();
+    } catch (err) {
+      console.error("Assignment error:", err);
     }
   }
 
@@ -51,6 +87,13 @@ export default function AdminDashboard() {
     loadComplaints();
   }, []);
 
+  // when complaints load, auto-fetch worker lists for each based on problem type
+  useEffect(() => {
+    complaints.forEach((c) => {
+      if (c.type) loadWorkersForType(c.type, c.id);
+    });
+  }, [complaints]);
+
   return (
     <div className="adminPageWrap">
       <div className="adminTopbar">
@@ -58,7 +101,6 @@ export default function AdminDashboard() {
           <h1 className="adminGreeting">Welcome, {username || "Admin"}</h1>
           <p className="adminHostel">Hostel: {hostel || "N/A"}</p>
         </div>
-
         <div className="adminTopbar__right">
           <button className="adminLogoutBtn" onClick={logout}>
             Logout
@@ -87,7 +129,6 @@ export default function AdminDashboard() {
                     <span className="cid">#{c.id}</span>
                     <span className="ctype">{c.type}</span>
                   </div>
-
                   <span
                     className={`statusBadge ${
                       (c.status || "").toLowerCase().replace(/\s+/g, "-") ||
@@ -110,8 +151,10 @@ export default function AdminDashboard() {
                     <span className="metaLabel">Student</span>
                     <span className="metaValue">{c.student_name}</span>
                   </div>
+                </div>
 
-                  <div className="metaPair">
+                <div className="metaRow">
+                  <div className="metaPair" style={{ gridColumn: "span 3" }}>
                     <span className="metaLabel">Proof</span>
                     <span className="metaValue">
                       {c.photo_url ? (
@@ -135,17 +178,53 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="actionRow">
-                  <label className="actionLabel">Update Status</label>
-                  <select
-                    className="statusSelect"
-                    value={c.status}
-                    onChange={(e) => updateStatus(c.id, e.target.value)}
+                <div className="actionRowSpace">
+                  {/* Worker assignment section */}
+                  <div className="actionBlock">
+                    <label className="actionLabel">Assign Worker</label>
+                    <select
+                      id={`worker-${c.id}`}
+                      className="workerSelect"
+                      defaultValue=""
+                    >
+                      <option value="">Select Worker</option>
+                      {workerMap[c.id]?.length > 0 ? (
+                        workerMap[c.id].map((w) => (
+                          <option key={w.id} value={w.name}>
+                            {w.name} ({w.work_type})
+                          </option>
+                        ))
+                      ) : (
+                        <option disabled>No available workers</option>
+                      )}
+                    </select>
+                  </div>
+
+                  {/* Status update */}
+                  <div className="actionBlock">
+                    <label className="actionLabel">Update Status</label>
+                    <select
+                      className="statusSelect"
+                      value={c.status}
+                      onChange={(e) => updateStatus(c.id, e.target.value)}
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Resolved">Resolved</option>
+                    </select>
+                  </div>
+
+                  <button
+                    className="assignBtn"
+                    onClick={() => {
+                      const worker = document.querySelector(
+                        `#worker-${c.id}`
+                      )?.value;
+                      assignWorker(c.id, worker);
+                    }}
                   >
-                    <option value="Pending">Pending</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Resolved">Resolved</option>
-                  </select>
+                    Assign Task
+                  </button>
                 </div>
               </li>
             ))}
