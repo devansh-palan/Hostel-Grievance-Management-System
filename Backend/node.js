@@ -8,9 +8,12 @@ import cookieParser from "cookie-parser";
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
+import twilio from "twilio";
+import axios from "axios";
 
 dotenv.config();
 const app = express();
+const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 app.use(cors({ origin: "http://localhost:5173", credentials: true }));
 app.use(express.json());
@@ -43,6 +46,20 @@ function authMiddleware(req, res, next) {
     next();
   });
 }
+
+async function sendWhatsAppMessage(phone, messageText) {
+  try {
+    await twilioClient.messages.create({
+      from: process.env.TWILIO_WHATSAPP_FROM,
+      to: `whatsapp:+91${phone}`, // assuming Indian numbers
+      body: messageText,
+    });
+    console.log(`📲 WhatsApp message sent to ${phone}`);
+  } catch (err) {
+    console.error("❌ WhatsApp send error:", err.message);
+  }
+}
+
 
 // ===============================
 // ☁️ CLOUDINARY CONFIGURATION
@@ -152,24 +169,25 @@ app.post("/api/verify-otp", async (req, res) => {
 // 📝 POST NEW COMPLAINT
 // ===============================
 app.post("/api/complaints", authMiddleware, upload.single("photo"), async (req, res) => {
-  const { type, description, hostel_name, room_no } = req.body;
-  if (!type || !description || !hostel_name || !room_no)
-    return res.status(400).json({ message: "All fields are required" });
+  const { type, description, hostel_name, room_no, floor_no, phone_number } = req.body;
+if (!type || !description || !hostel_name || !room_no || !phone_number)
+  return res.status(400).json({ message: "All fields are required" });
 
   try {
     const userRes = await db.query("SELECT id FROM users WHERE email = $1", [req.user.email]);
     if (userRes.rows.length === 0)
       return res.status(400).json({ message: "User not found" });
-    const userId = userRes.rows[0].id;
 
+    const userId = userRes.rows[0].id;
     const photoUrl = req.file ? req.file.path : null;
 
     const result = await db.query(
-      `INSERT INTO complaints (user_id, type, description, hostel_name, room_no, photo_url)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, type, description, hostel_name, room_no, photo_url, status`,
-      [userId, type, description, hostel_name, room_no, photoUrl]
-    );
+  `INSERT INTO complaints (user_id, type, description, hostel_name, room_no, floor_no, phone_number, photo_url)
+   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+   RETURNING id, type, description, hostel_name, room_no, floor_no, phone_number, photo_url, status`,
+  [userId, type, description, hostel_name, room_no, floor_no, phone_number, photoUrl]
+);
+
 
     res.json({ message: "Complaint submitted successfully", complaint: result.rows[0] });
   } catch (err) {
@@ -177,6 +195,7 @@ app.post("/api/complaints", authMiddleware, upload.single("photo"), async (req, 
     res.status(500).json({ message: "Error creating complaint" });
   }
 });
+
 
 // ===============================
 // 👨‍🏫 ADMIN LOGIN
@@ -216,35 +235,41 @@ app.get("/api/admin/complaints/pending", async (req, res) => {
 
     const complaints = await db.query(
       `SELECT 
-         c.id, 
-         c.type, 
-         c.description, 
-         c.hostel_name, 
-         c.room_no, 
-         c.status, 
-         c.created_at, 
-         c.photo_url,
-         u.name AS student_name, 
-         u.email AS student_email
+         c.id, c.type, c.description, c.hostel_name, c.room_no, c.floor_no, c.status, 
+         c.created_at, c.photo_url, c.worker_proof_url, c.assigned_worker,
+         u.name AS student_name, u.email AS student_email
        FROM complaints c
        JOIN users u ON c.user_id = u.id
-       WHERE c.hostel_name = $1 
-         AND c.status IN ('Pending', 'In Progress')   -- ✅ only pending + in progress
-       ORDER BY 
-         CASE 
-           WHEN c.status = 'Pending' THEN 1
-           WHEN c.status = 'In Progress' THEN 2
-         END, 
-         c.created_at DESC`,
+       WHERE c.hostel_name = $1
+         AND (c.status = 'Pending' OR c.status = 'In Progress')
+       ORDER BY c.created_at DESC`,
       [hostel]
     );
 
     res.json({ complaints: complaints.rows });
   } catch (err) {
-    console.error("Error fetching admin complaints:", err);
+    console.error("Error fetching complaints:", err);
     res.status(500).json({ message: "Error fetching complaints" });
   }
 });
+
+
+app.get("/api/complaints", authMiddleware, async (req, res) => {
+  try {
+    const complaints = await db.query(
+      `SELECT id, type, description, hostel_name, room_no, photo_url, status, created_at
+       FROM complaints
+       WHERE user_id = (SELECT id FROM users WHERE email = $1)
+       ORDER BY created_at DESC`,
+      [req.user.email]
+    );
+    res.json({ complaints: complaints.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching complaints" });
+  }
+});
+
 
 // ===============================
 // 🛠️ ADMIN UPDATE STATUS
@@ -254,14 +279,13 @@ app.put("/api/admin/complaints/:id/status", async (req, res) => {
   const { status } = req.body;
   const { hostel } = req.query;
 
-  console.log("🔧 Received:", { id, status, hostel }); // <--- add this
-
   if (!["Pending", "In Progress", "Resolved"].includes(status))
     return res.status(400).json({ message: "Invalid status" });
   if (!hostel)
     return res.status(400).json({ message: "Hostel name missing" });
 
   try {
+    // 🧠 1️⃣ Update the complaint status
     const result = await db.query(
       `UPDATE complaints 
        SET status = $1 
@@ -270,15 +294,89 @@ app.put("/api/admin/complaints/:id/status", async (req, res) => {
       [status, id, hostel]
     );
 
-    console.log("🧩 Update result:", result.rows); // <--- add this
-
     if (result.rows.length === 0)
       return res.status(404).json({ message: "Not found or not authorized" });
 
-    res.json({ message: "Status updated", complaint: result.rows[0] });
+    const complaint = result.rows[0];
+
+    // 📧 2️⃣ If status changed to "Resolved", send an email to the student
+    if (status === "Resolved") {
+      const userRes = await db.query(
+        `SELECT email, name FROM users WHERE id = $1`,
+        [complaint.user_id]
+      );
+
+      if (userRes.rows.length > 0) {
+        const { email, name } = userRes.rows[0];
+
+        // Send resolution email
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: process.env.GMAIL_USER,
+            pass: process.env.GMAIL_PASS,
+          },
+        });
+
+        const mailOptions = {
+          from: `"Hostel Grievance System" <${process.env.GMAIL_USER}>`,
+          to: email,
+          subject: "✅ Your Hostel Complaint Has Been Resolved",
+          html: `
+            <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+              <h2>Hi ${name || "Student"},</h2>
+              <p>We’re happy to inform you that your complaint has been <b>resolved</b>.</p>
+              <p><b>Complaint Details:</b></p>
+              <ul>
+                <li><b>Complaint ID:</b> #${complaint.id}</li>
+                <li><b>Type:</b> ${complaint.type}</li>
+                <li><b>Description:</b> ${complaint.description}</li>
+                <li><b>Hostel:</b> ${complaint.hostel_name}</li>
+                <li><b>Room No:</b> ${complaint.room_no}</li>
+              </ul>
+              <p>If you still face any issue, you can raise a new complaint anytime from your dashboard.</p>
+              <br/>
+              <p>Thank you for using the Hostel Grievance Portal.</p>
+              <p>– Hostel Administration</p>
+            </div>
+          `,
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`📧 Resolution email sent to ${email}`);
+      }
+    }
+
+    res.json({ message: "Status updated", complaint });
   } catch (err) {
     console.error("🔥 Error updating status:", err);
     res.status(500).json({ message: "Error updating status" });
+  }
+});
+
+app.get("/api/admin/workers", async (req, res) => {
+  try {
+    const { hostel, work_type } = req.query;
+
+    if (!hostel)
+      return res.status(400).json({ message: "Hostel is required" });
+    if (!work_type)
+      return res.status(400).json({ message: "Work type is required" });
+
+    const workers = await db.query(
+      `SELECT id, name, phone, work_type, current_status
+       FROM workers
+       WHERE hostel_name = $1 
+         AND work_type = $2 
+         AND current_status = 'Available'
+       ORDER BY name ASC`,
+      [hostel, work_type]
+    );
+
+    res.json({ workers: workers.rows });
+  } catch (err) {
+    console.error("Error fetching workers:", err);
+    res.status(500).json({ message: "Error fetching workers" });
   }
 });
 
@@ -301,6 +399,160 @@ app.get("/api/me", authMiddleware, async (req, res) => {
   }
 });
 
+app.put("/api/admin/complaints/:id/assign", async (req, res) => {
+  const { id } = req.params;
+  const { worker } = req.body;
+  const { hostel } = req.query;
 
+  if (!worker) return res.status(400).json({ message: "Worker name required" });
+  if (!hostel) return res.status(400).json({ message: "Hostel required" });
+
+  try {
+    // 1️⃣ Get complaint details including floor number
+    // 1️⃣ Get complaint details (include phone number)
+const complaintRes = await db.query(
+  `SELECT description, hostel_name, room_no, floor_no, phone_number 
+   FROM complaints 
+   WHERE id = $1`,
+  [id]
+);
+
+    if (complaintRes.rows.length === 0)
+      return res.status(404).json({ message: "Complaint not found" });
+
+    const complaint = complaintRes.rows[0];
+
+    // 2️⃣ Get worker details
+    const workerRes = await db.query(
+      `SELECT id, name, phone, work_type FROM workers 
+       WHERE name = $1 AND hostel_name = $2`,
+      [worker, hostel]
+    );
+    if (workerRes.rows.length === 0)
+      return res.status(404).json({ message: "Worker not found" });
+
+    const workerData = workerRes.rows[0];
+
+    // 3️⃣ Update complaint with assigned worker
+    await db.query(
+      `UPDATE complaints SET assigned_worker = $1, status = 'In Progress' WHERE id = $2`,
+      [workerData.name, id]
+    );
+
+    // 4️⃣ Mark worker as Busy
+    await db.query(
+      `UPDATE workers SET current_status = 'Busy' WHERE id = $1`,
+      [workerData.id]
+    );
+
+    // 5️⃣ Send WhatsApp message including floor number
+    const msg = `🛠️ *New Work Assignment*\n🏠 Hostel: ${complaint.hostel_name}\n🏢 Floor: ${complaint.floor_no || "N/A"}\n🚪 Room No: ${complaint.room_no}\n📞 Student Phone: ${complaint.phone_number || "Not provided"} (Call before visiting)\n🧾 Complaint: ${complaint.description}\n\nPlease attend to this issue as soon as possible.`;
+
+
+    await sendWhatsAppMessage(workerData.phone, msg);
+
+    res.json({
+      message: `Worker ${workerData.name} assigned and notified on WhatsApp.`,
+    });
+  } catch (err) {
+    console.error("Assignment + WhatsApp Error:", err);
+    res.status(500).json({ message: "Error assigning worker" });
+  }
+});
+
+
+app.post("/api/whatsapp/webhook", express.urlencoded({ extended: false }), async (req, res) => {
+  try {
+    console.log("📩 Incoming WhatsApp message:", req.body);
+
+    const from = req.body.From; // e.g. 'whatsapp:+919876543210'
+    const mediaUrl = req.body.MediaUrl0; // first media file
+    const numMedia = parseInt(req.body.NumMedia || "0");
+    const caption = req.body.Body?.trim(); // optional caption with complaint ID
+
+    if (!from || numMedia === 0 || !mediaUrl) {
+      console.log("No media or invalid message");
+      return res.sendStatus(200);
+    }
+
+    // 1️⃣ Find which worker sent the image
+    const workerPhone = from.replace("whatsapp:+91", "");
+    const workerRes = await db.query(
+      "SELECT * FROM workers WHERE phone = $1",
+      [workerPhone]
+    );
+
+    if (workerRes.rows.length === 0) {
+      console.log("Unknown worker:", workerPhone);
+      return res.sendStatus(200);
+    }
+
+    const worker = workerRes.rows[0];
+
+    // 2️⃣ Determine which complaint to update
+    let complaintId = null;
+
+    // If the worker included complaint ID in caption (e.g. "#12 Fixed")
+    const match = caption?.match(/#?(\d+)/);
+    if (match) {
+      complaintId = parseInt(match[1]);
+    } else {
+      // Otherwise, use most recent assigned complaint
+      const complaintRes = await db.query(
+        `SELECT id FROM complaints
+         WHERE assigned_worker = $1
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [worker.name]
+      );
+      if (complaintRes.rows.length > 0)
+        complaintId = complaintRes.rows[0].id;
+    }
+
+    if (!complaintId) {
+      console.log("⚠️ No matching complaint found for worker:", worker.name);
+      return res.sendStatus(200);
+    }
+
+    // 3️⃣ Securely download the Twilio image using authentication
+    const mediaResponse = await axios.get(mediaUrl, {
+      responseType: "arraybuffer",
+      auth: {
+        username: process.env.TWILIO_ACCOUNT_SID,
+        password: process.env.TWILIO_AUTH_TOKEN,
+      },
+    });
+
+    // 4️⃣ Convert to base64 for Cloudinary upload
+    const base64Image = Buffer.from(mediaResponse.data, "binary").toString("base64");
+    const contentType = req.body.MediaContentType0 || "image/jpeg";
+    const dataUri = `data:${contentType};base64,${base64Image}`;
+
+    // 5️⃣ Upload directly to Cloudinary
+    const uploadRes = await cloudinary.uploader.upload(dataUri, {
+      folder: "worker_proofs",
+      resource_type: "image",
+    });
+
+    console.log("✅ Uploaded to Cloudinary:", uploadRes.secure_url);
+
+    // 6️⃣ Update the complaint in DB
+    await db.query(
+  `UPDATE complaints 
+   SET worker_proof_url = $1
+   WHERE id = $2`,
+  [uploadRes.secure_url, complaintId]
+);
+
+console.log(`✅ Worker proof saved for complaint #${complaintId} (awaiting admin verification)`);
+
+// 7️⃣ (Optional) Notify admin via console or email
+// You could also integrate a WhatsApp or email notification here if you want.
+res.sendStatus(200);
+  } catch (err) {
+    console.error("❌ WhatsApp webhook error:", err);
+    res.sendStatus(500);
+  }
+});
 
 app.listen(5000, () => console.log("✅ Hostel Grievance backend running on port 5000"));
