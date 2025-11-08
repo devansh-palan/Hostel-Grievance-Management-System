@@ -1,61 +1,227 @@
-import { useState } from "react";
-import axios from "axios";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import "../style.css"; // ✅ correct path
 
 export default function Login() {
-  const navigate = useNavigate();
+  const [step, setStep] = useState("email"); // email → otp
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
+  const [otp, setOtp] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+  const [cooldown, setCooldown] = useState(0);
 
-  async function handleLogin(e) {
-    e.preventDefault();
-    setMessage("");
-    try {
-      const res = await axios.post(
-        "http://localhost:5000/api/login",
-        { email },
-        { withCredentials: true }
-      );
-      setMessage(res.data.message);
-      setTimeout(() => navigate("/dashboard"), 1000);
-    } catch (err) {
-      setMessage(err.response?.data?.message || "Login failed");
-    }
+  // ========================
+  // ✅ Correct API calls
+  // ========================
+
+  async function loginOrRegister(emailId, nameVal) {
+    const res = await fetch("http://localhost:5000/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: emailId, name: nameVal }),
+      credentials: "include",
+    });
+    return res.json();
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4">
-      <div className="w-full max-w-md bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-xl p-8 text-white">
-        <h2 className="text-3xl font-bold text-center mb-6">Welcome Back 👋</h2>
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Institute Email
-            </label>
-            <input
-              type="email"
-              placeholder="Enter your institute email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full p-3 rounded-lg bg-white/10 border border-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 font-semibold text-white transition-all"
-          >
-            Login
-          </button>
-        </form>
-        {message && <p className="text-center mt-4 text-sm">{message}</p>}
+  async function verifyOtp(payload) {
+    const res = await fetch("http://localhost:5000/api/verify-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      credentials: "include",
+    });
+    return res.json();
+  }
 
-        <p className="text-center text-sm mt-6">
-          Don’t have an account?{" "}
-          <Link to="/register" className="text-indigo-300 hover:underline">
-            Register here
-          </Link>
-        </p>
+  // Cooldown for resend OTP
+  useEffect(() => {
+    if (!cooldown) return;
+    const timer = setInterval(() => setCooldown((c) => (c > 0 ? c - 1 : 0)), 1000);
+    return () => clearInterval(timer);
+  }, [cooldown]);
+
+  // STEP 1: Send OTP / Login
+  const handleSendOtp = async (e) => {
+    e.preventDefault();
+    setError("");
+    setMsg("");
+
+    if (!email.trim()) return setError("Please enter a valid email");
+
+    try {
+      setLoading(true);
+      const res = await loginOrRegister(email.trim(), name.trim());
+
+      setMsg(res.message || "");
+      if (res.message?.includes("OTP")) {
+        setStep("otp");
+        setCooldown(30);
+      } else if (res.message?.includes("Login successful")) {
+        window.location.href = "/dashboard";
+      } else if (res.message?.includes("Verification")) {
+        setStep("otp");
+      } else if (res.error || res.message?.includes("Error")) {
+        setError(res.message || "Something went wrong");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Error sending OTP. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // STEP 2: Verify OTP
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setError("");
+    setMsg("");
+
+    if (!otp.trim()) return setError("Please enter the OTP");
+
+    try {
+      setLoading(true);
+      const res = await verifyOtp({ email, otp });
+
+      setMsg(res.message || "");
+      if (res.message?.includes("Verification successful")) {
+        window.location.href = "/dashboard";
+      } else {
+        setError(res.message || "Invalid OTP");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("OTP verification failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ========================
+  // UI
+  // ========================
+  return (
+    <div
+      className="page-wrap"
+      style={{
+        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+      }}
+    >
+      <div className="container auth-container">
+        <div className="glass-card">
+          <h1
+            style={{
+              textAlign: "center",
+              color: "white",
+              fontSize: "28px",
+              fontWeight: "700",
+              marginBottom: "10px",
+            }}
+          >
+            Hostel Resolve
+          </h1>
+
+          <h2 className="auth-title">
+            {step === "email" ? "Login / Register" : "Enter OTP"}
+          </h2>
+
+          {/* ============= EMAIL FORM ============= */}
+          {step === "email" && (
+            <form onSubmit={handleSendOtp}>
+              <div className="form-group">
+                <label className="form-label">Full Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Enter your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Institute Email</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  placeholder="example@students.vnit.ac.in"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  required
+                />
+              </div>
+
+              {error && <p style={{ color: "#ffb2b2" }}>{error}</p>}
+              {msg && <p style={{ color: "#b2ffcf" }}>{msg}</p>}
+
+              <button type="submit" className="primary-btn" disabled={loading}>
+                {loading ? "Processing..." : "Continue"}
+              </button>
+            </form>
+          )}
+
+          {/* ============= OTP FORM ============= */}
+          {step === "otp" && (
+            <form onSubmit={handleVerifyOtp}>
+              <div className="form-group">
+                <label className="form-label">Enter OTP</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Enter the 6-digit OTP"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="muted-link" style={{ marginTop: 6 }}>
+                Didn’t receive OTP?{" "}
+                <button
+                  type="button"
+                  disabled={cooldown > 0}
+                  onClick={handleSendOtp}
+                  style={{
+                    background: "transparent",
+                    color: "white",
+                    textDecoration: "underline",
+                    border: "none",
+                    cursor: cooldown > 0 ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend OTP"}
+                </button>
+              </div>
+
+              {error && <p style={{ color: "#ffb2b2" }}>{error}</p>}
+              {msg && <p style={{ color: "#b2ffcf" }}>{msg}</p>}
+
+              <button type="submit" className="primary-btn" disabled={loading}>
+                {loading ? "Verifying..." : "Verify OTP & Continue"}
+              </button>
+
+              <div className="muted-link" style={{ marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => setStep("email")}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "white",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                  }}
+                >
+                  Change Email
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );
