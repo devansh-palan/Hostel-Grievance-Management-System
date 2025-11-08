@@ -1,66 +1,93 @@
 import React, { useState, useRef } from "react";
-import "../style.css";     // ✅ updated filename (was styles.css)
+import "../style.css";
 
 export default function Dashboard() {
-
   const [hostel, setHostel] = useState("");
   const [room, setRoom] = useState("");
   const [problemType, setProblemType] = useState("");
   const [description, setDescription] = useState("");
   const [images, setImages] = useState([]);
-
+  const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    // ✅ YOUR existing API logic here (unchanged)
-    console.log({
-      hostel,
-      room,
-      problemType,
-      description,
-      imagesCount: images.length,
-    });
-
-    alert("Complaint Submitted Successfully!");
-
-    setHostel("");
-    setRoom("");
-    setProblemType("");
-    setDescription("");
-    setImages([]);
-  };
+  const name = localStorage.getItem("username") || "User";
+  const email = localStorage.getItem("email") || "user@mail.com";
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase();
 
   const handleFileChange = (event) => {
     const files = Array.from(event.target.files);
+    setImages(files);
+  };
 
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImages((prev) => [...prev, e.target.result]);
-      };
-      reader.readAsDataURL(file);
-    });
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!hostel || !room || !problemType || !description) {
+      alert("Please fill all fields before submitting.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("hostel_name", hostel);
+    formData.append("room_no", room);
+    formData.append("type", problemType);
+    formData.append("description", description);
+
+    // attach only the first image (backend expects single file: upload.single("photo"))
+    if (images[0]) formData.append("photo", images[0]);
+
+    setLoading(true);
+    try {
+      const res = await fetch("http://localhost:5000/api/complaints", {
+        method: "POST",
+        credentials: "include", // to send cookies for JWT auth
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert("✅ Complaint submitted successfully!");
+        setHostel("");
+        setRoom("");
+        setProblemType("");
+        setDescription("");
+        setImages([]);
+      } else {
+        alert("⚠️ " + data.message);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("❌ Error submitting complaint");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const removeImage = (index) => {
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await fetch("http://localhost:5000/api/logout", {
+      method: "POST",
+      credentials: "include",
+    });
     localStorage.clear();
     window.location.href = "/login";
   };
 
-  const name = localStorage.getItem("username") || "User";
-  const email = localStorage.getItem("email") || "user@mail.com";
-  const initials = name.split(" ").map(n => n[0]).join("").toUpperCase();
-
   return (
-    <div className="page-wrap" style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
+    <div
+      className="page-wrap"
+      style={{
+        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+      }}
+    >
       <div className="container dashboard-container">
-
         <div className="dashboard-header">
           <div className="welcome-text">
             <h1>Welcome back, {name}!</h1>
@@ -73,7 +100,9 @@ export default function Dashboard() {
               <div>{name}</div>
               <div style={{ fontSize: "12px", opacity: "0.8" }}>{email}</div>
             </div>
-            <button className="logout-btn" onClick={logout}>Logout</button>
+            <button className="logout-btn" onClick={logout}>
+              Logout
+            </button>
           </div>
         </div>
 
@@ -82,7 +111,6 @@ export default function Dashboard() {
 
           <form onSubmit={handleSubmit}>
             <div className="form-grid">
-
               <div className="form-group flexcol">
                 <label className="form-label">Hostel</label>
                 <select
@@ -140,8 +168,11 @@ export default function Dashboard() {
               <div className="form-group full-width flexcol">
                 <label className="form-label">Upload Photos (optional)</label>
 
-                <div className="file-upload" onClick={() => fileInputRef.current.click()}>
-                  Click to upload images or drag & drop
+                <div
+                  className="file-upload"
+                  onClick={() => fileInputRef.current.click()}
+                >
+                  Click to upload images
                 </div>
 
                 <input
@@ -154,10 +185,17 @@ export default function Dashboard() {
                 />
 
                 <div className="preview-container">
-                  {images.map((img, index) => (
+                  {images.map((file, index) => (
                     <div className="image-preview" key={index}>
-                      <img src={img} alt="preview" />
-                      <button type="button" className="remove-image" onClick={() => removeImage(index)}>
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt="preview"
+                      />
+                      <button
+                        type="button"
+                        className="remove-image"
+                        onClick={() => removeImage(index)}
+                      >
                         ✕
                       </button>
                     </div>
@@ -166,9 +204,14 @@ export default function Dashboard() {
               </div>
 
               <div className="form-group full-width">
-                <button type="submit" className="primary-btn">Submit Complaint</button>
+                <button
+                  type="submit"
+                  className="primary-btn"
+                  disabled={loading}
+                >
+                  {loading ? "Submitting..." : "Submit Complaint"}
+                </button>
               </div>
-
             </div>
           </form>
         </div>
