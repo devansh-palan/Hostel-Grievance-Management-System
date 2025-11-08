@@ -3,14 +3,15 @@ import "../dashboard.css";
 
 export default function AdminDashboard() {
   const [complaints, setComplaints] = useState([]);
-  const [workerMap, setWorkerMap] = useState({}); // each complaint has its own worker list
+  const [workerMap, setWorkerMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [assigning, setAssigning] = useState(false);
 
   const username = localStorage.getItem("admin_username");
   const hostel = localStorage.getItem("admin_hostel");
 
-  // Load all complaints (pending + in progress)
+  // Load complaints (Pending + In Progress)
   async function loadComplaints() {
     try {
       const res = await fetch(
@@ -27,7 +28,7 @@ export default function AdminDashboard() {
     }
   }
 
-  // Fetch workers dynamically by work type (problem type)
+  // Fetch workers dynamically per complaint (based on type)
   async function loadWorkersForType(workType, complaintId) {
     try {
       const res = await fetch(
@@ -43,21 +44,32 @@ export default function AdminDashboard() {
     }
   }
 
-  async function assignWorker(complaintId, worker) {
-    if (!worker) return alert("Select a worker first!");
+  // ✅ Assign worker (calls backend that sends WhatsApp automatically)
+  async function assignWorker(complaintId, workerName) {
+    if (!workerName) return alert("Please select a worker first.");
+    setAssigning(true);
+    setMessage("");
+
     try {
-      await fetch(
+      const res = await fetch(
         `http://localhost:5000/api/admin/complaints/${complaintId}/assign?hostel=${hostel}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ worker }),
+          body: JSON.stringify({ worker: workerName }),
         }
       );
-      alert("Worker Assigned ✅");
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to assign worker");
+
+      alert(`✅ ${data.message}`);
       loadComplaints();
     } catch (err) {
-      console.error("Assignment error:", err);
+      console.error("Error assigning worker:", err);
+      alert("❌ Failed to assign worker. Please try again.");
+    } finally {
+      setAssigning(false);
     }
   }
 
@@ -87,7 +99,6 @@ export default function AdminDashboard() {
     loadComplaints();
   }, []);
 
-  // when complaints load, auto-fetch worker lists for each based on problem type
   useEffect(() => {
     complaints.forEach((c) => {
       if (c.type) loadWorkersForType(c.type, c.id);
@@ -146,7 +157,6 @@ export default function AdminDashboard() {
                     <span className="metaLabel">Room</span>
                     <span className="metaValue">{c.room_no}</span>
                   </div>
-
                   <div className="metaPair">
                     <span className="metaLabel">Student</span>
                     <span className="metaValue">{c.student_name}</span>
@@ -216,6 +226,7 @@ export default function AdminDashboard() {
 
                   <button
                     className="assignBtn"
+                    disabled={assigning}
                     onClick={() => {
                       const worker = document.querySelector(
                         `#worker-${c.id}`
@@ -223,7 +234,7 @@ export default function AdminDashboard() {
                       assignWorker(c.id, worker);
                     }}
                   >
-                    Assign Task
+                    {assigning ? "Assigning..." : "Assign Task"}
                   </button>
                 </div>
               </li>
