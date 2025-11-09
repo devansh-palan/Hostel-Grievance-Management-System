@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import "../dashboard.css";
 
 export default function AdminDashboard() {
@@ -8,37 +8,58 @@ export default function AdminDashboard() {
   const [assigning, setAssigning] = useState(false);
   const [message, setMessage] = useState("");
 
+  const [selectedCat, setSelectedCat] = useState("All");
+
   const username = localStorage.getItem("admin_username");
   const hostel = localStorage.getItem("admin_hostel");
 
-  // ==========================
-  // Fetch complaints (critical first)
-  // ==========================
+  const CATEGORIES = [
+    "All",
+    "Electrical",
+    "Plumbing",
+    "Cleaning",
+    "Furniture",
+    "Internet",
+    "Others",
+  ];
+
+  function getCategoryFromType(type = "") {
+    const t = String(type).trim().toLowerCase();
+    if (["electrical", "electric", "power"].includes(t)) return "Electrical";
+    if (["plumbing", "water", "leak"].includes(t)) return "Plumbing";
+    if (["cleaning", "housekeeping"].includes(t)) return "Cleaning";
+    if (["furniture", "carpentry", "woodwork"].includes(t)) return "Furniture";
+    if (["internet", "wifi", "network"].includes(t)) return "Internet";
+    return "Others";
+  }
+
+  // Fetch complaints
   async function loadComplaints() {
     try {
       const res = await fetch(
         `http://localhost:5000/api/admin/complaints/pending?hostel=${hostel}`
       );
       const data = await res.json();
+
       if (!res.ok) throw new Error(data.message || "Failed to load complaints");
+
       setComplaints(data.complaints || []);
     } catch (err) {
       console.error("Error fetching complaints:", err);
-      setMessage(err.message || "Error fetching complaints");
+      setMessage(err.message);
     } finally {
       setLoading(false);
     }
   }
 
-  // ==========================
-  // Load workers dynamically
-  // ==========================
+  // Workers fetch
   async function loadWorkersForType(workType, complaintId) {
     try {
       const res = await fetch(
         `http://localhost:5000/api/admin/workers?hostel=${hostel}&work_type=${workType}`
       );
       const data = await res.json();
+
       setWorkerMap((prev) => ({
         ...prev,
         [complaintId]: data.workers || [],
@@ -48,9 +69,7 @@ export default function AdminDashboard() {
     }
   }
 
-  // ==========================
-  // Assign worker + notify via WhatsApp
-  // ==========================
+  // Assign worker
   async function assignWorker(complaintId, workerName) {
     if (!workerName) return alert("Please select a worker first.");
     setAssigning(true);
@@ -67,7 +86,7 @@ export default function AdminDashboard() {
       );
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to assign worker");
+      if (!res.ok) throw new Error(data.message);
 
       alert(`✅ ${data.message}`);
       loadComplaints();
@@ -79,9 +98,7 @@ export default function AdminDashboard() {
     }
   }
 
-  // ==========================
-  // Update complaint status
-  // ==========================
+  // Update status
   async function updateStatus(id, newStatus) {
     try {
       await fetch(
@@ -98,18 +115,12 @@ export default function AdminDashboard() {
     }
   }
 
-  // ==========================
-  // Logout
-  // ==========================
   function logout() {
     localStorage.removeItem("admin_username");
     localStorage.removeItem("admin_hostel");
     window.location.href = "/admin";
   }
 
-  // ==========================
-  // Lifecycle
-  // ==========================
   useEffect(() => {
     loadComplaints();
   }, []);
@@ -120,9 +131,41 @@ export default function AdminDashboard() {
     });
   }, [complaints]);
 
-  // ==========================
-  // UI
-  // ==========================
+  const categoryCounts = useMemo(() => {
+    const counts = {
+      All: complaints.length,
+      Electrical: 0,
+      Plumbing: 0,
+      Cleaning: 0,
+      Furniture: 0,
+      Internet: 0,
+      Others: 0,
+    };
+    complaints.forEach((c) => {
+      const cat = getCategoryFromType(c.type);
+      counts[cat]++;
+    });
+    return counts;
+  }, [complaints]);
+
+  const displayComplaints = useMemo(() => {
+    let list = [...complaints];
+
+    if (selectedCat !== "All") {
+      list = list.filter((c) => getCategoryFromType(c.type) === selectedCat);
+    }
+
+    list.sort((a, b) => {
+      const aCrit =
+        String(a.priority).toLowerCase() === "critical" ? 1 : 0;
+      const bCrit =
+        String(b.priority).toLowerCase() === "critical" ? 1 : 0;
+      return bCrit - aCrit;
+    });
+
+    return list;
+  }, [complaints, selectedCat]);
+
   return (
     <div className="adminPageWrap">
       {/* Topbar */}
@@ -138,29 +181,50 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* Sorter Pills */}
+      <div className="filterBar">
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat}
+            className={`filterChip ${selectedCat === cat ? "active" : ""}`}
+            onClick={() => setSelectedCat(cat)}
+          >
+            <span className="chipLabel">{cat}</span>
+            <span className="chipCount">{categoryCounts[cat]}</span>
+          </button>
+        ))}
+      </div>
+
       {message && <div className="adminInlineAlert">{message}</div>}
 
-      {/* Complaints Section */}
       <section className="complaintsSection">
         <div className="sectionHead">
-          <h2 className="sectionTitle">Pending & In-Progress Complaints</h2>
-          <span className="countPill">{complaints.length}</span>
+          <h2 className="sectionTitle">
+            {selectedCat === "All"
+              ? "Pending & In-Progress Complaints"
+              : `${selectedCat} Complaints`}
+          </h2>
+          <span className="countPill">{displayComplaints.length}</span>
         </div>
 
         {loading ? (
           <div className="loadingRow">Loading complaints...</div>
-        ) : complaints.length === 0 ? (
+        ) : displayComplaints.length === 0 ? (
           <div className="emptyState">No complaints found.</div>
         ) : (
           <ul className="complaintList">
-            {complaints.map((c) => (
+            {displayComplaints.map((c) => (
               <li className="complaintItem" key={c.id}>
-                {/* Header */}
                 <div className="complaintHead">
                   <div className="idType">
                     <span className="cid">#{c.id}</span>
-                    <span className="ctype">{c.type}</span>
-                    {c.priority === "critical" && (
+                    <span className="ctype">
+                      {c.type}{" "}
+                      <em className="ctypeCat">
+                        ({getCategoryFromType(c.type)})
+                      </em>
+                    </span>
+                    {String(c.priority).toLowerCase() === "critical" && (
                       <span className="criticalBadge">🚨 Critical</span>
                     )}
                   </div>
@@ -176,23 +240,25 @@ export default function AdminDashboard() {
 
                 <p className="cdesc">{c.description}</p>
 
-                {/* Meta info */}
                 <div className="metaRow">
                   <div className="metaPair">
                     <span className="metaLabel">Floor</span>
                     <span className="metaValue">{c.floor_no || "N/A"}</span>
                   </div>
+
                   <div className="metaPair">
                     <span className="metaLabel">Room</span>
                     <span className="metaValue">{c.room_no}</span>
                   </div>
+
                   <div className="metaPair">
                     <span className="metaLabel">Student</span>
                     <span className="metaValue">{c.student_name}</span>
                   </div>
+
                   <div className="metaPair">
                     <span className="metaLabel">Phone</span>
-                    <span className="metaValue">{c.phone_number || "N/A"}</span>
+                    <span className="metaValue">{c.phone_number}</span>
                   </div>
                 </div>
 
@@ -210,8 +276,8 @@ export default function AdminDashboard() {
                         >
                           <img
                             src={c.photo_url}
-                            alt="proof"
                             className="proofThumb"
+                            alt="proof"
                           />
                           <span>View</span>
                         </a>
@@ -236,8 +302,8 @@ export default function AdminDashboard() {
                         >
                           <img
                             src={c.worker_proof_url}
-                            alt="worker-proof"
                             className="proofThumb"
+                            alt="worker-proof"
                           />
                           <span>View</span>
                         </a>
@@ -246,10 +312,10 @@ export default function AdminDashboard() {
                   </div>
                 )}
 
-                {/* Worker assignment + Status */}
                 <div className="actionRowSpace">
                   <div className="actionBlock">
                     <label className="actionLabel">Assign Worker</label>
+
                     {c.assigned_worker ? (
                       <div className="assignedWorkerBox">
                         <span className="assignedWorkerName">
@@ -266,6 +332,7 @@ export default function AdminDashboard() {
                         defaultValue=""
                       >
                         <option value="">Select Worker</option>
+
                         {workerMap[c.id]?.length > 0 ? (
                           workerMap[c.id].map((w) => (
                             <option key={w.id} value={w.name}>
@@ -284,7 +351,9 @@ export default function AdminDashboard() {
                     <select
                       className="statusSelect"
                       value={c.status}
-                      onChange={(e) => updateStatus(c.id, e.target.value)}
+                      onChange={(e) =>
+                        updateStatus(c.id, e.target.value)
+                      }
                     >
                       <option value="Pending">Pending</option>
                       <option value="In Progress">In Progress</option>

@@ -101,6 +101,45 @@ async function sendWhatsAppMessage(phone, messageText) {
   }
 }
 
+async function sendWorkAssignedEmail(studentEmail, studentName, complaintId, workerName, workerPhone, room_no, hostel_name) {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_PASS,
+    },
+  });
+
+  const html = `
+    <div style="font-family: Arial; line-height: 1.5;">
+      <h2>Work Assigned for Your Complaint</h2>
+      <p>Hello ${studentName || "Student"},</p>
+      <p>Your complaint <b>#${complaintId}</b> has been assigned to a worker.</p>
+
+      <p><b>Worker Details:</b><br/>
+      👷 <b>${workerName}</b><br/>
+      📞 <b>${workerPhone}</b> (They may call you, please keep your phone available)
+      </p>
+
+      <p><b>Hostel:</b> ${hostel_name}<br/>
+      <b>Room No:</b> ${room_no}</p>
+
+      <p>Please stay available and ensure someone is present inside your room when the worker arrives.</p>
+
+      <br/>
+      <p>– Hostel Administration</p>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"Hostel Grievance System" <${process.env.GMAIL_USER}>`,
+    to: studentEmail,
+    subject: "🛠️ Worker Assigned – Please Be Available",
+    html,
+  });
+}
+
+
 
 // ===============================
 // ☁️ CLOUDINARY CONFIGURATION
@@ -142,6 +181,15 @@ async function sendOtpEmail(email, otp) {
     text: `Your OTP is ${otp}. It will expire in 10 minutes.`,
   });
 }
+
+async function getAdminPhone(hostel_name) {
+  const adminRes = await db.query(
+    "SELECT phone FROM admins WHERE hostel_assigned = $1 LIMIT 1",
+    [hostel_name]
+  );
+  return adminRes.rows.length ? adminRes.rows[0].phone : null;
+}
+
 
 // ===============================
 // 👤 STUDENT LOGIN (OTP SEND/RESEND)
@@ -230,7 +278,28 @@ app.post("/api/complaints", authMiddleware, upload.single("photo"), async (req, 
     // 🧠 Classify priority using Gemini AI
     const priority = await classifyComplaintPriority(description);
     console.log(`🔍 Complaint classified as: ${priority}`);
+    
+    if (priority === "critical") {
+  console.log("🚨 Critical complaint detected! Sending admin WhatsApp alert...");
 
+  // 1️⃣ Fetch admin phone number
+  const adminPhone = await getAdminPhone(hostel_name);
+
+  if (adminPhone) {
+    const adminMsg = `🚨 *CRITICAL COMPLAINT ALERT*\n\n` +
+      `Hostel: ${hostel_name}\n` +
+      `Floor: ${floor_no || "N/A"}\n` +
+      `Room: ${room_no}\n` +
+      `Phone: ${phone_number}\n` +
+      `Description: ${description}\n\n` +
+      `Please check the admin panel immediately.`;
+
+    await sendWhatsAppMessage(adminPhone, adminMsg);
+    console.log(`📲 Critical alert sent to admin (+91${adminPhone})`);
+  } else {
+    console.log("⚠️ No admin phone number found for this hostel.");
+  }
+}
     // 💾 Save complaint in database
     const result = await db.query(
       `INSERT INTO complaints 
@@ -361,6 +430,16 @@ app.put("/api/admin/complaints/:id/status", async (req, res) => {
 
     // 📧 2️⃣ If status changed to "Resolved", send an email to the student
     if (status === "Resolved") {
+      if (complaint.assigned_worker) {
+    await db.query(
+      `UPDATE workers SET current_status = 'Available'
+       WHERE name = $1 AND hostel_name = $2`,
+      [complaint.assigned_worker, complaint.hostel_name]
+    );
+
+    console.log(`✅ Worker ${complaint.assigned_worker} marked AVAILABLE`);
+  }
+
       const userRes = await db.query(
         `SELECT email, name FROM users WHERE id = $1`,
         [complaint.user_id]
@@ -468,14 +547,13 @@ app.put("/api/admin/complaints/:id/assign", async (req, res) => {
   if (!hostel) return res.status(400).json({ message: "Hostel required" });
 
   try {
-    // 1️⃣ Get complaint details including floor number
-    // 1️⃣ Get complaint details (include phone number)
-const complaintRes = await db.query(
-  `SELECT description, hostel_name, room_no, floor_no, phone_number 
-   FROM complaints 
-   WHERE id = $1`,
-  [id]
-);
+    // 1️⃣ Get complaint details (include phone + user_id)
+    const complaintRes = await db.query(
+      `SELECT description, hostel_name, room_no, floor_no, phone_number, user_id
+       FROM complaints 
+       WHERE id = $1`,
+      [id]
+    );
 
     if (complaintRes.rows.length === 0)
       return res.status(404).json({ message: "Complaint not found" });
@@ -488,6 +566,7 @@ const complaintRes = await db.query(
        WHERE name = $1 AND hostel_name = $2`,
       [worker, hostel]
     );
+
     if (workerRes.rows.length === 0)
       return res.status(404).json({ message: "Worker not found" });
 
@@ -505,17 +584,40 @@ const complaintRes = await db.query(
       [workerData.id]
     );
 
-    // 5️⃣ Send WhatsApp message including floor number
-    const msg = `🛠️ *New Work Assignment*\n🏠 Hostel: ${complaint.hostel_name}\n🏢 Floor: ${complaint.floor_no || "N/A"}\n🚪 Room No: ${complaint.room_no}\n📞 Student Phone: ${complaint.phone_number || "Not provided"} (Call before visiting)\n🧾 Complaint: ${complaint.description}\n\nPlease attend to this issue as soon as possible.`;
+    // 5️⃣ Get student email + name
+    const studentRes = await db.query(
+      `SELECT email, name FROM users WHERE id = $1`,
+      [complaint.user_id]
+    );
 
+    if (studentRes.rows.length > 0) {
+      const { email, name } = studentRes.rows[0];
+
+      // 6️⃣ Send email notifying the student
+      await sendWorkAssignedEmail(
+  email,
+  name,
+  id,
+  workerData.name,
+  workerData.phone,          // ✅ Added worker phone
+  complaint.room_no,
+  complaint.hostel_name
+);
+
+
+      console.log(`📧 Work assignment email sent to ${email}`);
+    }
+
+    // 7️⃣ Send WhatsApp message including floor number (existing)
+    const msg = `🛠️ *New Work Assignment*\n🏠 Hostel: ${complaint.hostel_name}\n🏢 Floor: ${complaint.floor_no || "N/A"}\n🚪 Room No: ${complaint.room_no}\n📞 Student Phone: ${complaint.phone_number || "Not provided"} (Call before visiting)\n🧾 Complaint: ${complaint.description}\n\nPlease attend to this issue as soon as possible.`;
 
     await sendWhatsAppMessage(workerData.phone, msg);
 
     res.json({
-      message: `Worker ${workerData.name} assigned and notified on WhatsApp.`,
+      message: `Worker ${workerData.name} assigned. Student notified by email & worker notified on WhatsApp.`,
     });
   } catch (err) {
-    console.error("Assignment + WhatsApp Error:", err);
+    console.error("Assignment + Notification Error:", err);
     res.status(500).json({ message: "Error assigning worker" });
   }
 });
