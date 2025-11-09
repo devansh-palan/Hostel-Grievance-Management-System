@@ -1,15 +1,13 @@
-// /src/pages/AdminLogin.jsx
 import React, { useState } from "react";
-import "../style.css";
+import "../login.css";
 
 export default function AdminLogin() {
-  // ===== state =====
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ===== API: keep exactly as your current implementation =====
+  // API CALLS UNCHANGED
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -25,7 +23,6 @@ export default function AdminLogin() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Login failed");
 
-      // store & redirect (unchanged)
       localStorage.setItem("admin_username", data.username);
       localStorage.setItem("admin_hostel", data.hostel);
       window.location.href = "/admin/dashboard";
@@ -37,29 +34,37 @@ export default function AdminLogin() {
     }
   };
 
-  // ===== UI: mirrored from Login.jsx (header, two cards, form classes) =====
   return (
     <div className="mainLoginContainer">
       <div className="pageShell">
-        {/* Header */}
+        {/* Header stays INSIDE layout on desktop; becomes fixed on mobile via CSS */}
         <header className="loginHeader">
           <div className="headerBrand">
             <img src="/logo.png" alt="Hostel Resolve Logo" className="headerLogo" />
             <h2 className="headerTitle">HOSTEL RESOLVE</h2>
           </div>
 
+          {/* Desktop actions */}
           <nav className="headerActions">
             <a className="headerTab" href="/login">Student Login</a>
             <a className="headerTab active" href="/admin">Admin Login</a>
           </nav>
+
+          {/* Mobile hamburger (<=768px) */}
+          <input id="navToggle" type="checkbox" className="navToggle" />
+          <label htmlFor="navToggle" className="navBurger" aria-label="Menu">
+            <span></span><span></span><span></span>
+          </label>
+          <div className="mobileMenu">
+            <a className="headerTab" href="/login">Student Login</a>
+            <a className="headerTab" href="/admin">Admin Login</a>
+          </div>
         </header>
 
-        {/* Two cards (3:2) */}
+        {/* Two cards */}
         <div className="loginCardsWrapper">
-          {/* Left image/pattern card */}
           <div className="cardBox leftImageCard" />
 
-          {/* Right admin form card */}
           <div className="cardBox rightLoginCard">
             <h1 className="loginTitle">
               ADMIN <span>LOGIN</span>

@@ -1,302 +1,243 @@
-/* =========================================================
-   IMPORT FONTS
-========================================================= */
+/* ===================== FONTS ===================== */
 @import url('https://fonts.googleapis.com/css2?family=Anton&family=Poppins:wght@300;400;500;600;700;900&display=swap');
 
-/* =========================================================
-   GLOBAL RESET
-========================================================= */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* ===================== RESET ===================== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { font-family: "Poppins", sans-serif; }
 
-html, body {
-  font-family: "Poppins", sans-serif;
-}
-
-/* =========================================================
-   VARIABLES
-========================================================= */
-:root {
+/* ===================== VARS ===================== */
+:root{
   --primary: #ff6b00;
   --primary-light: #ff8c33;
   --primary-dark: #e65a00;
 
-  --card-h: min(72vh, 720px); /* equal height cards */
+  --card-h: min(72vh, 720px);
   --card-radius: 40px;
 
   --poster-tight: -0.5px;
   --poster-wide: 1px;
+
+  --header-h: 70px; /* header height used on mobile */
 }
 
-/* =========================================================
-   PAGE BASE STRUCTURE
-========================================================= */
-body {
-  background: #000;
-  min-height: 100vh;
-  overflow-x: hidden;
+/* ===================== LAYOUT ===================== */
+body { background:#000; min-height:100vh; overflow-x:hidden; }
+
+.mainLoginContainer{
+  width:100%;
+  min-height:100vh;
+  background:#000;
+  display:flex;
+  justify-content:flex-start;
+  /* no padding-top by default (desktop) */
 }
 
-.mainLoginContainer {
-  width: 100%;
-  min-height: 100vh;
-  background: #000;
-  display: flex;
-  justify-content: flex-start;
+.pageShell{
+  width:80vw;
+  margin:auto;
+  display:flex;
+  flex-direction:column;
+  gap:22px;
+  padding-top:0;
 }
 
-/* total layout width = 80% */
-.pageShell {
-  width: 80vw;
-  margin: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-
-/* =========================================================
-   HEADER AREA
-========================================================= */
-
+/* ===================== HEADER (DESKTOP DEFAULT) ===================== */
 .headerTitle,
 .headerTitle *,
 .loginTitle,
-.loginTitle * {
-  font-family: "Anton", sans-serif !important;
-}
-.loginHeader {
-  width: 100%;
-  display: flex;
-  justify-content: space-between; /* logo left, buttons right */
-  align-items: center;
-  padding: 24px 0 6px 0;
+.loginTitle *{
+  font-family:"Anton",sans-serif !important;
 }
 
-/* ----- LOGO + TITLE LEFT SECTION ----- */
-.headerBrand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.headerLogo {
-  height: 36px;
-}
-
-.headerTitle {
-  font-family: "Anton", sans-serif;
-  color: #ffffff;
-  font-size: 26px;
-  letter-spacing: var(--poster-wide);
-  text-transform: uppercase;
-  line-height: 1;
-}
-
-/* =========================================================
-   HEADER BUTTONS — ROUNDED TAB BUTTONS
-========================================================= */
-.headerActions {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-/* Rounded pill-like tabs */
-.headerTab {
-  font-family: "Anton", sans-serif;     /* SAME FONT AS HOSTEL RESOLVE */
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  font-size: 18px;
-  text-decoration: none;
-  padding: 10px 22px;
-  border-radius: 40px;
-  border: 2px solid #2b2b2b;
-  background: #111;
-  color: #d6d6d6;
-  transition: 0.22s ease;
-}
-
-.headerTab:hover {
-  transform: translateY(-1px);
-  background: #181818;
-  border-color: #3c3c3c;
-  color: white;
-}
-
-/* Active tab = Orange filled pill */
-.headerTab.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: black;
-}
-
-/* =========================================================
-   TWO CARD LAYOUT (3:2 RATIO)
-========================================================= */
-.loginCardsWrapper {
-  width: 100%;
-  display: flex;
-  align-items: stretch; /* equal height */
-  gap: 40px;
-}
-
-.cardBox {
-  height: var(--card-h);
-  border-radius: var(--card-radius);
-  overflow: hidden;
-}
-
-/* LEFT IMAGE CARD */
-.leftImageCard {
-  flex: 3 1 0;
-  background: #181818;
-  background-image: url("/images.png");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-
-/*
-   Add your image:
-   .leftImageCard {
-     background-image: url("/yourImage.png");
-   }
-*/
-
-/* RIGHT LOGIN FORM CARD */
-.rightLoginCard {
-  flex: 2 1 0;
-  background: #111;
-  color: white;
-  padding: 60px 50px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-/* =========================================================
-   FORM POSTER VIBES
-========================================================= */
-.loginTitle {
-  font-family: "Anton", sans-serif;
-  text-transform: uppercase;
-  font-size: clamp(40px, 4.6vw, 56px);
-  line-height: 0.95;
-  letter-spacing: var(--poster-tight);
-  margin-bottom: 4px;
-}
-
-.loginTitle span {
-  color: var(--primary);
-}
-
-.loginSubTitle {
-  font-size: 20px;
-  font-weight: 600;
-  color: #d7d7d7;
-  margin-bottom: 36px;
-  letter-spacing: 0.2px;
-}
-
-/* underline accent */
-.loginTitle + .loginSubTitle {
+/* Desktop/web = header INSIDE normal flow */
+.loginHeader{
   position: relative;
-  padding-top: 10px;
-}
-.loginTitle + .loginSubTitle::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 3px;
-  width: 64px;
-  background: var(--primary);
-  border-radius: 3px;
-}
-
-/* =========================================================
-   INPUT FIELDS
-========================================================= */
-.loginForm {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.loginForm label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #e9e9e9;
-}
-
-.loginForm input {
   width: 100%;
-  padding: 16px 18px;
-  border-radius: 35px;
-  border: 2px solid #3a3a3a;
-  background: #0e0e0e;
-  color: white;
-  font-size: 15px;
-  outline: none;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px 0;
+  z-index:50;
+  background: transparent;
+  border-bottom: 1px solid transparent; /* no line on desktop */
 }
 
-.loginForm input::placeholder {
-  color: #a8a8a8;
+.headerBrand{ display:flex; align-items:center; gap:12px; }
+.headerLogo{ height:36px; }
+.headerTitle{
+  color:#fff; font-size:26px; letter-spacing:var(--poster-wide);
+  text-transform:uppercase; line-height:1;
 }
 
-.loginForm input:focus {
-  border-color: var(--primary);
-  background: #0b0b0b;
+/* Header tabs (desktop) */
+.headerActions{ display:flex; align-items:center; gap:14px; }
+.headerTab{
+  font-family:"Anton",sans-serif;
+  text-transform:uppercase; letter-spacing:1px; font-size:18px;
+  text-decoration:none; padding:10px 22px; border-radius:40px;
+  border:2px solid #2b2b2b; background:#111; color:#d6d6d6; transition:.22s ease;
+}
+.headerTab:hover{ transform:translateY(-1px); background:#181818; border-color:#3c3c3c; color:#fff; }
+.headerTab.active{ background:var(--primary); border-color:var(--primary); color:#000; }
+
+/* Hamburger (hidden on desktop) */
+.navToggle{ display:none; }
+.navBurger{ display:none; }
+
+/* Mobile dropdown panel base (hidden) */
+.mobileMenu{ display:none; }
+
+/* ===================== CARDS ===================== */
+.loginCardsWrapper{
+  width:100%;
+  display:flex;
+  align-items:stretch;
+  gap:40px;
 }
 
-/* =========================================================
-   SUBMIT BUTTON
-========================================================= */
-.loginBtn {
-  margin-top: 24px;
-  padding: 16px 18px;
-  background: var(--primary);
-  border: none;
-  border-radius: 40px;
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: 0.3px;
-  color: #000;
-  cursor: pointer;
-  transition: transform 0.18s ease, filter 0.18s ease;
+.cardBox{ height:var(--card-h); border-radius:var(--card-radius); overflow:hidden; }
+
+.leftImageCard{
+  flex:3 1 0;
+  background:#181818;
+  background-image:url("/images.png");
+  background-size:cover; background-position:center; background-repeat:no-repeat;
 }
 
-.loginBtn:hover {
-  transform: translateY(-1px) scale(1.02);
-  filter: brightness(1.03);
+.rightLoginCard{
+  flex:2 1 0;
+  background:#111; color:#fff;
+  padding:60px 50px;
+  display:flex; flex-direction:column; justify-content:center;
 }
 
-/* =========================================================
-   RESPONSIVE DESIGN
-========================================================= */
-@media (max-width: 1200px) {
-  .rightLoginCard { padding: 48px 40px; }
+/* ===================== FORM LOOK ===================== */
+.loginTitle{
+  font-family:"Anton",sans-serif; text-transform:uppercase;
+  font-size: clamp(40px, 4.6vw, 56px);
+  line-height:.95; letter-spacing:var(--poster-tight); margin-bottom:4px;
+}
+.loginTitle span{ color:var(--primary); }
+
+.loginSubTitle{
+  font-size:20px; font-weight:600; color:#d7d7d7; margin-bottom:36px; letter-spacing:.2px;
 }
 
-@media (max-width: 960px) {
-  :root { --card-h: auto; }
+.loginTitle + .loginSubTitle{ position:relative; padding-top:10px; }
+.loginTitle + .loginSubTitle::before{
+  content:""; position:absolute; top:0; left:0; height:3px; width:64px;
+  background:var(--primary); border-radius:3px;
+}
 
-  .loginCardsWrapper {
-    flex-direction: column;
+.loginForm{ display:flex; flex-direction:column; gap:10px; }
+.loginForm label{ font-size:14px; font-weight:600; color:#e9e9e9; }
+.loginForm input{
+  width:100%; padding:16px 18px; border-radius:35px; border:2px solid #3a3a3a;
+  background:#0e0e0e; color:#fff; font-size:15px; outline:none;
+}
+.loginForm input::placeholder{ color:#a8a8a8; }
+.loginForm input:focus{ border-color:var(--primary); background:#0b0b0b; }
+
+.loginBtn{
+  margin-top:24px; padding:16px 18px; background:var(--primary); border:none;
+  border-radius:40px; font-size:18px; font-weight:800; letter-spacing:.3px; color:#000;
+  cursor:pointer; transition: transform .18s ease, filter .18s ease;
+}
+.loginBtn:hover{ transform:translateY(-1px) scale(1.02); filter:brightness(1.03); }
+
+.error-text{ color:#ff9b9b; margin-top:4px; font-size:14px; }
+.success-text{ color:#9dffbe; margin-top:4px; font-size:14px; }
+.muted-link{ color:#bdbdbd; font-size:14px; }
+.link-btn{
+  background:none; border:none; padding:0; margin:0; font:inherit; color:#ffffff;
+  text-decoration:underline; cursor:pointer;
+}
+
+/* ===================== RESPONSIVE ===================== */
+@media (max-width: 1200px){
+  .rightLoginCard{ padding:48px 40px; }
+}
+
+@media (max-width: 960px){
+  :root{ --card-h:auto; }
+  .loginCardsWrapper{ flex-direction:column; }
+  .rightLoginCard, .leftImageCard{ width:100%; flex:none; }
+  .rightLoginCard{ padding:36px 26px; }
+  .headerTab{ font-size:16px; padding:8px 16px; }
+}
+
+/* ===== MOBILE — header becomes fixed OUTSIDE visually ===== */
+@media (max-width: 768px){
+  .pageShell{ width:92vw; gap:18px; }
+
+  /* Header floats at the top on mobile */
+  .loginHeader{
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: 14px 24px;
+    background: rgba(0,0,0,0.92);
+    border-bottom: 1px solid #1a1a1a;
+    z-index: 999;
+    backdrop-filter: blur(8px);
   }
 
-  .rightLoginCard, .leftImageCard {
-    width: 100%;
-    flex: none;
+  /* Push content below fixed header (mobile only) */
+  .mainLoginContainer{
+    padding-top: calc(var(--header-h) + 20px) !important;
   }
 
-  .rightLoginCard { padding: 36px 26px; }
+  /* Desktop tabs hidden, hamburger shown */
+  .headerActions{ display:none; }
 
-  .headerTab {
-    font-size: 16px;
-    padding: 8px 16px;
+  .navBurger{
+    display:inline-flex;
+    width:40px; height:40px; border-radius:10px;
+    border:2px solid #2b2b2b; background:#111;
+    justify-content:center; align-items:center; cursor:pointer; transition:.2s ease;
   }
+  .navBurger:hover{ background:#181818; border-color:#3c3c3c; }
+
+  .navBurger span{
+    display:block; width:20px; height:2px; background:#e6e6e6;
+    margin:4px auto; transition:.2s ease;
+  }
+
+  /* transform into "X" when checked */
+  .navToggle:checked + .navBurger span:nth-child(1){
+    transform: translateY(6px) rotate(45deg);
+  }
+  .navToggle:checked + .navBurger span:nth-child(2){
+    opacity:0;
+  }
+  .navToggle:checked + .navBurger span:nth-child(3){
+    transform: translateY(-6px) rotate(-45deg);
+  }
+
+  /* Mobile dropdown */
+  .mobileMenu{
+    display:none;
+    position: fixed;
+    top: var(--header-h);
+    left:0; right:0;
+    padding:12px 20px 18px;
+    background: rgba(10,10,10,0.96);
+    border-bottom: 1px solid #1a1a1a;
+    gap:10px; z-index:998; flex-direction:column;
+  }
+
+  /* Show when toggled: input.navToggle + label.navBurger + .mobileMenu */
+  .navToggle:checked + .navBurger + .mobileMenu{ display:flex; }
+
+  .mobileMenu .headerTab{
+    width:100%; text-align:center; border-radius:18px; padding:12px 16px; font-size:16px;
+  }
+
+  .headerTitle{ font-size:22px; letter-spacing:.5px; }
+  .loginCardsWrapper{ gap:18px; }
+  .rightLoginCard{ padding:26px 20px; }
+}
+
+@media (max-width: 420px){
+  .headerTitle{ font-size:20px; }
+  .mobileMenu .headerTab{ font-size:15px; }
 }
