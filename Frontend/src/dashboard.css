@@ -273,7 +273,7 @@
 }
 
 .assignedWorkerBox {
-  background: #f4f4f4;
+  background: #2e2d2d;
   padding: 6px 10px;
   border-radius: 6px;
   font-weight: 500;
@@ -288,4 +288,19 @@
 .assignedWorkerNote {
   color: #888;
   font-size: 0.85rem;
+}
+
+.criticalBadge {
+  background-color: #ff3b30;
+  color: white;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 5px;
+  margin-left: 10px;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }

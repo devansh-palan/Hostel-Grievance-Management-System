@@ -12,7 +12,7 @@ export default function AdminDashboard() {
   const hostel = localStorage.getItem("admin_hostel");
 
   // ==========================
-  // Fetch all pending + in-progress complaints
+  // Fetch complaints (critical first)
   // ==========================
   async function loadComplaints() {
     try {
@@ -31,7 +31,7 @@ export default function AdminDashboard() {
   }
 
   // ==========================
-  // Load workers dynamically based on work type and hostel
+  // Load workers dynamically
   // ==========================
   async function loadWorkersForType(workType, complaintId) {
     try {
@@ -49,7 +49,7 @@ export default function AdminDashboard() {
   }
 
   // ==========================
-  // Assign worker and send WhatsApp automatically
+  // Assign worker + notify via WhatsApp
   // ==========================
   async function assignWorker(complaintId, workerName) {
     if (!workerName) return alert("Please select a worker first.");
@@ -80,7 +80,7 @@ export default function AdminDashboard() {
   }
 
   // ==========================
-  // Update complaint status (Pending / In Progress / Resolved)
+  // Update complaint status
   // ==========================
   async function updateStatus(id, newStatus) {
     try {
@@ -108,7 +108,7 @@ export default function AdminDashboard() {
   }
 
   // ==========================
-  // Lifecycle Hooks
+  // Lifecycle
   // ==========================
   useEffect(() => {
     loadComplaints();
@@ -160,6 +160,9 @@ export default function AdminDashboard() {
                   <div className="idType">
                     <span className="cid">#{c.id}</span>
                     <span className="ctype">{c.type}</span>
+                    {c.priority === "critical" && (
+                      <span className="criticalBadge">🚨 Critical</span>
+                    )}
                   </div>
                   <span
                     className={`statusBadge ${
@@ -176,12 +179,20 @@ export default function AdminDashboard() {
                 {/* Meta info */}
                 <div className="metaRow">
                   <div className="metaPair">
+                    <span className="metaLabel">Floor</span>
+                    <span className="metaValue">{c.floor_no || "N/A"}</span>
+                  </div>
+                  <div className="metaPair">
                     <span className="metaLabel">Room</span>
                     <span className="metaValue">{c.room_no}</span>
                   </div>
                   <div className="metaPair">
                     <span className="metaLabel">Student</span>
                     <span className="metaValue">{c.student_name}</span>
+                  </div>
+                  <div className="metaPair">
+                    <span className="metaLabel">Phone</span>
+                    <span className="metaValue">{c.phone_number || "N/A"}</span>
                   </div>
                 </div>
 
@@ -236,63 +247,66 @@ export default function AdminDashboard() {
                 )}
 
                 {/* Worker assignment + Status */}
-<div className="actionRowSpace">
-  <div className="actionBlock">
-    <label className="actionLabel">Assign Worker</label>
-    {c.assigned_worker ? (
-      <div className="assignedWorkerBox">
-        <span className="assignedWorkerName">
-          👷 {c.assigned_worker}
-        </span>
-        <span className="assignedWorkerNote">(Already Assigned)</span>
-      </div>
-    ) : (
-      <select
-        id={`worker-${c.id}`}
-        className="workerSelect"
-        defaultValue=""
-      >
-        <option value="">Select Worker</option>
-        {workerMap[c.id]?.length > 0 ? (
-          workerMap[c.id].map((w) => (
-            <option key={w.id} value={w.name}>
-              {w.name} ({w.work_type})
-            </option>
-          ))
-        ) : (
-          <option disabled>No available workers</option>
-        )}
-      </select>
-    )}
-  </div>
+                <div className="actionRowSpace">
+                  <div className="actionBlock">
+                    <label className="actionLabel">Assign Worker</label>
+                    {c.assigned_worker ? (
+                      <div className="assignedWorkerBox">
+                        <span className="assignedWorkerName">
+                          👷 {c.assigned_worker}
+                        </span>
+                        <span className="assignedWorkerNote">
+                          (Already Assigned)
+                        </span>
+                      </div>
+                    ) : (
+                      <select
+                        id={`worker-${c.id}`}
+                        className="workerSelect"
+                        defaultValue=""
+                      >
+                        <option value="">Select Worker</option>
+                        {workerMap[c.id]?.length > 0 ? (
+                          workerMap[c.id].map((w) => (
+                            <option key={w.id} value={w.name}>
+                              {w.name} ({w.work_type})
+                            </option>
+                          ))
+                        ) : (
+                          <option disabled>No available workers</option>
+                        )}
+                      </select>
+                    )}
+                  </div>
 
-  <div className="actionBlock">
-    <label className="actionLabel">Update Status</label>
-    <select
-      className="statusSelect"
-      value={c.status}
-      onChange={(e) => updateStatus(c.id, e.target.value)}
-    >
-      <option value="Pending">Pending</option>
-      <option value="In Progress">In Progress</option>
-      <option value="Resolved">Resolved</option>
-    </select>
-  </div>
+                  <div className="actionBlock">
+                    <label className="actionLabel">Update Status</label>
+                    <select
+                      className="statusSelect"
+                      value={c.status}
+                      onChange={(e) => updateStatus(c.id, e.target.value)}
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Resolved">Resolved</option>
+                    </select>
+                  </div>
 
-  {!c.assigned_worker && (
-    <button
-      className="assignBtn"
-      disabled={assigning}
-      onClick={() => {
-        const worker = document.querySelector(`#worker-${c.id}`)?.value;
-        assignWorker(c.id, worker);
-      }}
-    >
-      {assigning ? "Assigning..." : "Assign Task"}
-    </button>
-  )}
-</div>
-
+                  {!c.assigned_worker && (
+                    <button
+                      className="assignBtn"
+                      disabled={assigning}
+                      onClick={() => {
+                        const worker = document.querySelector(
+                          `#worker-${c.id}`
+                        )?.value;
+                        assignWorker(c.id, worker);
+                      }}
+                    >
+                      {assigning ? "Assigning..." : "Assign Task"}
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

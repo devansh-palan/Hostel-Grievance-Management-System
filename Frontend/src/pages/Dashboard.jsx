@@ -5,17 +5,18 @@ export default function Dashboard() {
   const [hostel, setHostel] = useState("");
   const [floor, setFloor] = useState("");
   const [room, setRoom] = useState("");
+  const [phone, setPhone] = useState("");
   const [problemType, setProblemType] = useState("");
   const [description, setDescription] = useState("");
-  const [images, setImages] = useState([]); // previews (we'll send first image file as "photo")
-  const [fileObjects, setFileObjects] = useState([]); // original File objects
+  const [images, setImages] = useState([]);
+  const [fileObjects, setFileObjects] = useState([]);
   const [complaints, setComplaints] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
 
   const fileInputRef = useRef(null);
-
   const name = localStorage.getItem("username") || "User";
 
-  // ===== Load previous complaints from your backend (UNCHANGED endpoint) =====
+  // Load complaints
   async function loadComplaints() {
     try {
       const res = await fetch("http://localhost:5000/api/complaints", {
@@ -23,13 +24,14 @@ export default function Dashboard() {
       });
       const data = await res.json();
       const rows = Array.isArray(data?.complaints) ? data.complaints : [];
-      // Map to UI shape expected by abc.html-like component
+
       const mapped = rows.map((c) => ({
         id: c.id,
-        title: c.description?.slice(0, 60) || c.type || "Complaint",
+        description: c.description || "",
         type: c.type || "Other",
-        createdAt: c.created_at || "",
-        resolved: (c.status || "").toLowerCase() === "resolved",
+        createdAt: new Date(c.created_at).toLocaleString(),
+        status: c.status || "Pending",
+        photoUrl: c.photo_url || null,
       }));
       setComplaints(mapped);
     } catch (err) {
@@ -42,7 +44,7 @@ export default function Dashboard() {
     loadComplaints();
   }, []);
 
-  // ===== Drag/drop + picker =====
+  // File selection
   const onFilesSelected = (files) => {
     if (!files?.length) return;
     const imgs = [];
@@ -52,7 +54,6 @@ export default function Dashboard() {
       reader.onload = (e) => {
         imgs.push(e.target.result);
         blobs.push(file);
-        // batch update when last loads
         if (imgs.length === files.length) {
           setImages((prev) => [...prev, ...imgs]);
           setFileObjects((prev) => [...prev, ...blobs]);
@@ -63,30 +64,31 @@ export default function Dashboard() {
   };
 
   const handleFileChange = (e) => onFilesSelected(e.target.files);
-
   const removeImage = (index) => {
     setImages((prev) => prev.filter((_, i) => i !== index));
     setFileObjects((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // ===== Submit complaint (UNCHANGED endpoint & field names) =====
-  // Backend expects: type, description, hostel_name, room_no, photo (single file)
+  // Submit complaint
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!hostel || !floor || !room || !problemType || !description.trim()) {
+    if (!hostel || !floor || !room || !phone || !problemType || !description.trim()) {
       alert("Please fill all required fields.");
       return;
     }
 
+    if (submitting) return;
     try {
+      setSubmitting(true);
       const fd = new FormData();
       fd.append("type", problemType);
-      fd.append("description", `${description.trim()}`);
+      fd.append("description", description.trim());
       fd.append("hostel_name", hostel);
       fd.append("room_no", room);
+      fd.append("floor_no", floor);
+      fd.append("phone_number", phone);
 
-      // only first image as single "photo" (as per backend contract)
       if (fileObjects[0]) fd.append("photo", fileObjects[0]);
 
       const res = await fetch("http://localhost:5000/api/complaints", {
@@ -99,20 +101,20 @@ export default function Dashboard() {
       if (!res.ok) throw new Error(data?.message || "Failed to submit complaint");
 
       alert("Complaint Submitted Successfully!");
-      // reset
       setHostel("");
       setFloor("");
       setRoom("");
+      setPhone("");
       setProblemType("");
       setDescription("");
       setImages([]);
       setFileObjects([]);
-
-      // refresh list
-      loadComplaints();
+      await loadComplaints();
     } catch (err) {
       console.error(err);
       alert("There was an error submitting your complaint.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -127,7 +129,6 @@ export default function Dashboard() {
     window.location.href = "/login";
   };
 
-  // helper
   const floors = Array.from({ length: 10 }, (_, i) => `${i + 1}`);
   const hostels = [
     "HB1","HB2","HB3","HB4","HB5","HB6","HB7","HB8","HB9","HB10","HB11","GH1","GH2",
@@ -146,7 +147,7 @@ export default function Dashboard() {
           <button className="logout-btn" onClick={logout}>Logout</button>
         </div>
 
-        {/* MAIN: parallel columns */}
+        {/* MAIN */}
         <div
           className="dashboard-main"
           onDragEnter={(e) => e.preventDefault()}
@@ -159,16 +160,12 @@ export default function Dashboard() {
           {/* LEFT: Complaint Form */}
           <div className="complaint-form">
             <div className="form-title">Submit a Complaint</div>
-            <form onSubmit={handleSubmit} id="complaintFormReact">
+            <form onSubmit={handleSubmit}>
               <div className="form-grid">
+                {/* Hostel */}
                 <div className="form-group">
                   <label className="form-label">Hostel</label>
-                  <select
-                    className="form-select"
-                    value={hostel}
-                    onChange={(e) => setHostel(e.target.value)}
-                    required
-                  >
+                  <select className="form-select" value={hostel} onChange={(e) => setHostel(e.target.value)} required>
                     <option value="">Select Hostel</option>
                     {hostels.map((h) => (
                       <option key={h} value={h}>{h}</option>
@@ -176,14 +173,10 @@ export default function Dashboard() {
                   </select>
                 </div>
 
+                {/* Floor */}
                 <div className="form-group">
                   <label className="form-label">Floor</label>
-                  <select
-                    className="form-select"
-                    value={floor}
-                    onChange={(e) => setFloor(e.target.value)}
-                    required
-                  >
+                  <select className="form-select" value={floor} onChange={(e) => setFloor(e.target.value)} required>
                     <option value="">Select Floor</option>
                     {floors.map((f) => (
                       <option key={f} value={f}>{f}</option>
@@ -191,26 +184,31 @@ export default function Dashboard() {
                   </select>
                 </div>
 
+                {/* Room */}
                 <div className="form-group">
                   <label className="form-label">Room Number</label>
+                  <input type="text" className="form-input" placeholder="Enter Room No." value={room} onChange={(e) => setRoom(e.target.value)} required />
+                </div>
+
+                {/* Phone */}
+                <div className="form-group">
+                  <label className="form-label">Phone Number</label>
                   <input
-                    type="text"
+                    type="tel"
                     className="form-input"
-                    placeholder="Enter Room No."
-                    value={room}
-                    onChange={(e) => setRoom(e.target.value)}
+                    placeholder="Enter Phone No."
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                     required
+                    pattern="[0-9]{10}"
+                    maxLength="10"
                   />
                 </div>
 
+                {/* Problem Type */}
                 <div className="form-group">
                   <label className="form-label">Problem Type</label>
-                  <select
-                    className="form-select"
-                    value={problemType}
-                    onChange={(e) => setProblemType(e.target.value)}
-                    required
-                  >
+                  <select className="form-select" value={problemType} onChange={(e) => setProblemType(e.target.value)} required>
                     <option value="">Select Problem</option>
                     {problems.map((p) => (
                       <option key={p} value={p}>{p}</option>
@@ -218,24 +216,16 @@ export default function Dashboard() {
                   </select>
                 </div>
 
+                {/* Description */}
                 <div className="form-group full-width">
                   <label className="form-label">Problem Description</label>
-                  <textarea
-                    className="form-textarea"
-                    placeholder="Describe the problem in detail..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    required
-                  />
+                  <textarea className="form-textarea" placeholder="Describe the problem in detail..." value={description} onChange={(e) => setDescription(e.target.value)} required />
                 </div>
 
+                {/* Upload */}
                 <div className="form-group full-width">
                   <label className="form-label">Upload Photos (optional)</label>
-                  <div
-                    className="file-upload"
-                    onClick={() => fileInputRef.current?.click()}
-                    title="Click or drag & drop"
-                  >
+                  <div className="file-upload" onClick={() => fileInputRef.current?.click()} title="Click or drag & drop">
                     Click to upload images or drag & drop
                   </div>
                   <input
@@ -250,25 +240,17 @@ export default function Dashboard() {
                     {images.map((src, idx) => (
                       <div className="image-preview" key={idx}>
                         <img src={src} alt={`preview-${idx}`} />
-                        <button
-                          type="button"
-                          className="remove-image"
-                          onClick={() => removeImage(idx)}
-                          title="Remove"
-                        >
-                          ✕
-                        </button>
+                        <button type="button" className="remove-image" onClick={() => removeImage(idx)} title="Remove">✕</button>
                       </div>
                     ))}
                   </div>
-                  <div className="muted-link" style={{ marginTop: 6 }}>
-                    (Only the <strong>first</strong> image will be uploaded as the
-                    complaint photo, matching the backend.)
-                  </div>
                 </div>
 
+                {/* Submit */}
                 <div className="form-group full-width">
-                  <button type="submit" className="primary-btn">Submit Complaint</button>
+                  <button type="submit" className="primary-btn" disabled={submitting}>
+                    {submitting ? "Submitting..." : "Submit Complaint"}
+                  </button>
                 </div>
               </div>
             </form>
@@ -278,30 +260,38 @@ export default function Dashboard() {
           <aside className="records-card">
             <div className="records-title">Previous Complaints</div>
             <div className="complaints-list">
-              {complaints.length === 0 && (
+              {complaints.length === 0 ? (
                 <div className="complaint-item empty-state">No complaints yet.</div>
-              )}
+              ) : (
+                complaints.map((item) => (
+                  <div className="complaint-item" key={item.id}>
+                    <div className="complaint-row">
+                      <span className={`status-dot ${
+                        item.status.toLowerCase() === "resolved" ? "green" :
+                        item.status.toLowerCase() === "in progress" ? "orange" :
+                        "red"
+                      }`} title={item.status} />
+                      <div className="complaint-info">
+                        <span className="complaint-title">{item.type}</span>
+                        <span className="complaint-meta">{item.description}</span>
+                        <span className="complaint-time">{item.createdAt}</span>
+                      </div>
+                    </div>
 
-              {complaints.map((item) => (
-                <div className="complaint-item" key={item.id}>
-                  <div className="complaint-row">
-                    <span
-                      className={`status-dot ${item.resolved ? "green" : "red"}`}
-                      title={item.resolved ? "Resolved" : "Not Resolved"}
-                    />
-                    <div className="complaint-info">
-                      <span className="complaint-title">{item.title}</span>
-                      <span className="complaint-meta">{item.type}</span>
-                      <span className="complaint-time">{item.createdAt}</span>
+                    {item.photoUrl && (
+                      <div className="complaint-photo">
+                        <a href={item.photoUrl} target="_blank" rel="noopener noreferrer">
+                          <img src={item.photoUrl} alt="complaint" className="proofThumb" />
+                        </a>
+                      </div>
+                    )}
+
+                    <div className={`status-text ${item.status.toLowerCase()}`}>
+                      {item.status}
                     </div>
                   </div>
-                  <div
-                    className={`status-text ${item.resolved ? "resolved" : "pending"}`}
-                  >
-                    {item.resolved ? "Resolved" : "Not resolved"}
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </aside>
         </div>
