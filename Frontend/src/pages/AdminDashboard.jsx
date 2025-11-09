@@ -218,16 +218,13 @@ export default function AdminDashboard() {
                 <div className="complaintHead">
                   <div className="idType">
                     <span className="cid">#{c.id}</span>
-                    <span className="ctype">
-                      {c.type}{" "}
-                      <em className="ctypeCat">
-                        ({getCategoryFromType(c.type)})
-                      </em>
-                    </span>
-                    {String(c.priority).toLowerCase() === "critical" && (
-                      <span className="criticalBadge">🚨 Critical</span>
-                    )}
+                    <span className="ctype">{getCategoryFromType(c.type)}</span>
+                      {String(c.priority || "").toLowerCase() === "critical" && (
+                    <span className="criticalBadge">🚨 Critical</span>
+                  )}
                   </div>
+
+                  
                   <span
                     className={`statusBadge ${
                       (c.status || "").toLowerCase().replace(/\s+/g, "-") ||

@@ -278,40 +278,85 @@ app.post("/api/complaints", authMiddleware, upload.single("photo"), async (req, 
     // 🧠 Classify priority using Gemini AI
     const priority = await classifyComplaintPriority(description);
     console.log(`🔍 Complaint classified as: ${priority}`);
-    
+
     if (priority === "critical") {
-  console.log("🚨 Critical complaint detected! Sending admin WhatsApp alert...");
+      const adminPhone = await getAdminPhone(hostel_name);
+      if (adminPhone) {
+        const adminMsg = `🚨 *CRITICAL COMPLAINT ALERT*
+Hostel: ${hostel_name}
+Floor: ${floor_no || "N/A"}
+Room: ${room_no}
+Phone: ${phone_number}
+Description: ${description}`;
+        await sendWhatsAppMessage(adminPhone, adminMsg);
+      }
+    }
 
-  // 1️⃣ Fetch admin phone number
-  const adminPhone = await getAdminPhone(hostel_name);
-
-  if (adminPhone) {
-    const adminMsg = `🚨 *CRITICAL COMPLAINT ALERT*\n\n` +
-      `Hostel: ${hostel_name}\n` +
-      `Floor: ${floor_no || "N/A"}\n` +
-      `Room: ${room_no}\n` +
-      `Phone: ${phone_number}\n` +
-      `Description: ${description}\n\n` +
-      `Please check the admin panel immediately.`;
-
-    await sendWhatsAppMessage(adminPhone, adminMsg);
-    console.log(`📲 Critical alert sent to admin (+91${adminPhone})`);
-  } else {
-    console.log("⚠️ No admin phone number found for this hostel.");
-  }
-}
-    // 💾 Save complaint in database
+    // 💾 Save complaint
     const result = await db.query(
       `INSERT INTO complaints 
        (user_id, type, description, hostel_name, room_no, floor_no, phone_number, photo_url, priority)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       RETURNING id, type, description, hostel_name, room_no, floor_no, phone_number, photo_url, status, priority`,
+       RETURNING *`,
       [userId, type, description, hostel_name, room_no, floor_no, phone_number, photoUrl, priority]
     );
 
+    const complaint = result.rows[0];
+
+    // ✅ AUTO-ASSIGN WORKER (types are already same)
+    console.log("🔍 Checking for auto-assignment...");
+
+    const autoWorker = await db.query(
+      `SELECT id, name, phone FROM workers
+       WHERE hostel_name = $1 AND work_type = $2 AND current_status = 'Available'
+       LIMIT 1`,
+      [hostel_name, type] // ✅ direct match
+    );
+
+    if (autoWorker.rows.length > 0) {
+      const w = autoWorker.rows[0];
+
+      console.log(`✅ Auto-assigning worker: ${w.name}`);
+
+      // Assign worker
+      await db.query(
+        `UPDATE complaints SET assigned_worker = $1, status = 'In Progress' WHERE id = $2`,
+        [w.name, complaint.id]
+      );
+
+      // Mark worker busy
+      await db.query(
+        `UPDATE workers SET current_status = 'Busy' WHERE id = $1`,
+        [w.id]
+      );
+
+      // Email student
+      const studentRes = await db.query(
+        `SELECT email, name FROM users WHERE id = $1`,
+        [complaint.user_id]
+      );
+
+      if (studentRes.rows.length > 0) {
+        const { email, name } = studentRes.rows[0];
+        await sendWorkAssignedEmail(
+          email, name, complaint.id, w.name, w.phone, room_no, hostel_name
+        );
+      }
+
+      // WhatsApp the worker
+      const msg = `🛠️ *New Work Assignment*
+🏠 Hostel: ${hostel_name}
+🏢 Floor: ${floor_no}
+🚪 Room: ${room_no}
+📞 Student Phone: ${phone_number}
+🧾 Complaint: ${description}`;
+      await sendWhatsAppMessage(w.phone, msg);
+    }
+
+    // ✅ FINALLY SEND RESPONSE (after everything)
     res.json({
       message: "Complaint submitted successfully",
-      complaint: result.rows[0],
+      complaint,
     });
 
   } catch (err) {
@@ -430,15 +475,7 @@ app.put("/api/admin/complaints/:id/status", async (req, res) => {
 
     // 📧 2️⃣ If status changed to "Resolved", send an email to the student
     if (status === "Resolved") {
-      if (complaint.assigned_worker) {
-    await db.query(
-      `UPDATE workers SET current_status = 'Available'
-       WHERE name = $1 AND hostel_name = $2`,
-      [complaint.assigned_worker, complaint.hostel_name]
-    );
-
-    console.log(`✅ Worker ${complaint.assigned_worker} marked AVAILABLE`);
-  }
+      
 
       const userRes = await db.query(
         `SELECT email, name FROM users WHERE id = $1`,
@@ -699,14 +736,42 @@ app.post("/api/whatsapp/webhook", express.urlencoded({ extended: false }), async
     console.log("✅ Uploaded to Cloudinary:", uploadRes.secure_url);
 
     // 6️⃣ Update the complaint in DB
-    await db.query(
+    // 6️⃣ Save proof URL
+await db.query(
   `UPDATE complaints 
    SET worker_proof_url = $1
    WHERE id = $2`,
   [uploadRes.secure_url, complaintId]
 );
 
-console.log(`✅ Worker proof saved for complaint #${complaintId} (awaiting admin verification)`);
+console.log(`✅ Worker proof saved for complaint #${complaintId}`);
+
+// ✅ 7️⃣ Get assigned worker from complaint
+const assignedRes = await db.query(
+  `SELECT assigned_worker, hostel_name 
+   FROM complaints
+   WHERE id = $1`,
+  [complaintId]
+);
+
+if (assignedRes.rows.length === 0) {
+  console.log("⚠️ No assigned worker found for complaint");
+  return res.sendStatus(200);
+}
+
+const assignedWorkerName = assignedRes.rows[0].assigned_worker;
+const assignedWorkerHostel = assignedRes.rows[0].hostel_name;
+
+// ✅ 8️⃣ Free the correct worker
+await db.query(
+  `UPDATE workers 
+   SET current_status = 'Available'
+   WHERE name = $1 AND hostel_name = $2`,
+  [assignedWorkerName, assignedWorkerHostel]
+);
+
+console.log(`✅ Worker ${assignedWorkerName} marked AVAILABLE after proof`);
+
 
 // 7️⃣ (Optional) Notify admin via console or email
 // You could also integrate a WhatsApp or email notification here if you want.
@@ -716,5 +781,93 @@ res.sendStatus(200);
     res.sendStatus(500);
   }
 });
+
+
+// ===============================
+// ⏳ AUTO-ASSIGN WORKER EVERY 15 MINUTES
+// ===============================
+
+async function autoAssignPendingComplaints() {
+  try {
+    console.log("⏳ Auto-checking pending complaints...");
+
+    // 1️⃣ Fetch all pending complaints with NO assigned worker
+    const pending = await db.query(
+      `SELECT id, type, hostel_name, room_no, floor_no, phone_number, description, user_id 
+       FROM complaints 
+       WHERE status = 'Pending' AND assigned_worker IS NULL
+       ORDER BY created_at ASC`
+    );
+
+    if (pending.rows.length === 0) {
+      console.log("✅ No pending complaints requiring auto-assignment.");
+      return;
+    }
+
+    for (const c of pending.rows) {
+      console.log(`🔍 Checking complaint #${c.id} (${c.type}) for auto-assign...`);
+
+      // 2️⃣ Find available worker of same type & hostel
+      const workerRes = await db.query(
+        `SELECT id, name, phone 
+         FROM workers 
+         WHERE hostel_name = $1 
+           AND work_type = $2 
+           AND current_status = 'Available'
+         LIMIT 1`,
+        [c.hostel_name, c.type]
+      );
+
+      if (workerRes.rows.length === 0) {
+        console.log(`⛔ No free worker available for ${c.type} in ${c.hostel_name}`);
+        continue;
+      }
+
+      const w = workerRes.rows[0];
+
+      console.log(`✅ Auto-assigning worker ${w.name} to complaint #${c.id}`);
+
+      // 3️⃣ Assign worker
+      await db.query(
+        `UPDATE complaints 
+         SET assigned_worker = $1, status = 'In Progress'
+         WHERE id = $2`,
+        [w.name, c.id]
+      );
+
+      // 4️⃣ Mark worker Busy
+      await db.query(
+        `UPDATE workers SET current_status = 'Busy' WHERE id = $1`,
+        [w.id]
+      );
+
+      // 5️⃣ Notify worker on WhatsApp
+      const msg = `🛠️ *Automatic Work Assignment*\n🏠 Hostel: ${c.hostel_name}\n🏢 Floor: ${c.floor_no}\n🚪 Room: ${c.room_no}\n📞 Student Phone: ${c.phone_number}\n🧾 Complaint: ${c.description}`;
+      await sendWhatsAppMessage(w.phone, msg);
+
+      // 6️⃣ Notify student via email
+      const studentRes = await db.query(
+        `SELECT email, name FROM users WHERE id = $1`,
+        [c.user_id]
+      );
+
+      if (studentRes.rows.length > 0) {
+        const { email, name } = studentRes.rows[0];
+        await sendWorkAssignedEmail(
+          email, name, c.id, w.name, w.phone, c.room_no, c.hostel_name
+        );
+      }
+
+      console.log(`📌 Complaint #${c.id} auto-assigned to ${w.name}`);
+    }
+
+  } catch (err) {
+    console.error("🔥 Auto-assignment error:", err);
+  }
+}
+
+// Run every 15 minutes
+setInterval(autoAssignPendingComplaints, 60 * 1000);
+
 
 app.listen(5000, () => console.log("✅ Hostel Grievance backend running on port 5000"));
